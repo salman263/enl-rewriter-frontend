@@ -4,12 +4,20 @@ import { useState } from "react";
 
 export default function Home() {
   const [text, setText] = useState("");
-  const [tone, setTone] = useState("Regular");
+  const [sliderValue, setSliderValue] = useState(2); // 1 = Fluent, 2 = Regular, 3 = Creative
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Word count calculation
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+
+  // স্লাইডারের ভ্যালু অনুযায়ী টোন সেট করা
+  const getTone = (value) => {
+    if (value == 1) return "Fluent";
+    if (value == 2) return "Regular";
+    if (value == 3) return "Creative";
+    return "Regular";
+  };
 
   const handleRewrite = async () => {
     if (!text) return;
@@ -22,7 +30,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: text, tone: tone }),
+        body: JSON.stringify({ text: text, tone: getTone(sliderValue) }),
       });
 
       const data = await res.json();
@@ -172,25 +180,26 @@ export default function Home() {
                 
                 <div className="flex-1 w-full max-w-md">
                    <div className="mb-2 text-[14px] font-bold text-[#000000]">Settings:</div>
-                   <div className="flex items-center justify-between text-[12px] text-[#585858] mb-1">
-                      <span>More Conservative</span>
-                      <span>Regular</span>
-                      <span>More Adventurous</span>
+                   <div className="flex items-center justify-between text-[12px] text-[#585858] mb-2 font-medium">
+                      <span className={sliderValue == 1 ? "text-[#03d665] font-bold" : ""}>More Conservative</span>
+                      <span className={sliderValue == 2 ? "text-[#03d665] font-bold" : ""}>Regular</span>
+                      <span className={sliderValue == 3 ? "text-[#03d665] font-bold" : ""}>More Adventurous</span>
                    </div>
-                   <select 
-                      className="w-full h-[8px] bg-[#f1f1f1] rounded-lg appearance-none cursor-pointer outline-none border-none text-transparent"
+                   
+                   {/* Real Working Slider */}
+                   <input 
+                      type="range" 
+                      min="1" 
+                      max="3" 
+                      step="1"
+                      value={sliderValue}
+                      onChange={(e) => setSliderValue(e.target.value)}
+                      className="w-full h-2 bg-[#f1f1f1] rounded-lg appearance-none cursor-pointer outline-none"
                       style={{
-                        background: tone === 'Fluent' ? 'linear-gradient(90deg, #03d665 0%, #f1f1f1 0%)' :
-                                    tone === 'Regular' ? 'linear-gradient(90deg, #03d665 50%, #f1f1f1 50%)' :
-                                    'linear-gradient(90deg, #03d665 100%, #f1f1f1 100%)'
+                        background: `linear-gradient(to right, #03d665 ${(sliderValue - 1) * 50}%, #f1f1f1 ${(sliderValue - 1) * 50}%)`,
+                        accentColor: '#03d665' // This makes the thumb green in modern browsers
                       }}
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                   >
-                      <option value="Fluent">Conservative</option>
-                      <option value="Regular">Regular</option>
-                      <option value="Creative">Adventurous</option>
-                   </select>
+                   />
                 </div>
 
                 <div className="w-full md:w-auto text-right">
