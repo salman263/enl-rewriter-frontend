@@ -4,10 +4,9 @@ import { useState } from "react";
 
 export default function Home() {
   const [text, setText] = useState("");
-  const [tone, setTone] = useState("Professional");
+  const [tone, setTone] = useState("Regular");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   // Word count calculation
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -16,7 +15,6 @@ export default function Home() {
     if (!text) return;
     setLoading(true);
     setResult("");
-    setCopied(false);
 
     try {
       const res = await fetch("https://enl-rewriter-backend.onrender.com/api/rewrite", {
@@ -40,154 +38,179 @@ export default function Home() {
   const handleCopy = () => {
     if (result) {
       navigator.clipboard.writeText(result);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      alert("Copied to clipboard!");
     }
   };
 
   return (
-    <div className="min-h-screen font-sans selection:bg-[#ccf0f0]" style={{ backgroundColor: '#fafbfe', color: '#585858', fontFamily: '"Poppins", sans-serif' }}>
+    <div className="flex h-screen bg-[#fafbfe] text-[#585858] font-sans overflow-hidden selection:bg-[#03d665] selection:text-white">
       
-      {/* WordAi Navbar */}
-      <header className="bg-white border-b border-[#f1f1f1] h-[70px] flex items-center justify-between px-6 sm:px-10 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2 cursor-pointer">
-          <div className="text-white font-bold text-xl w-9 h-9 flex items-center justify-center rounded" style={{ backgroundColor: '#1bb3b6' }}>
-            W
-          </div>
-          <span className="text-[22px] font-bold tracking-tight" style={{ color: '#000000' }}>
-            Word<span style={{ color: '#1bb3b6' }}>Ai</span>
-          </span>
-        </div>
-        
-        <div className="hidden md:flex items-center gap-8 text-[14px] font-medium" style={{ color: '#585858' }}>
-          <a href="#" className="border-b-2 py-[23px]" style={{ color: '#1bb3b6', borderColor: '#1bb3b6' }}>Rewrite Articles</a>
-          <a href="#" className="hover:text-[#1bb3b6] transition-colors py-[23px]">Saved Articles</a>
-          <a href="#" className="hover:text-[#1bb3b6] transition-colors py-[23px]">API</a>
-          <div className="ml-4 w-9 h-9 rounded-full flex items-center justify-center text-white font-bold cursor-pointer transition-colors shadow-sm" style={{ backgroundColor: '#1bb3b6' }}>
-            M
+      {/* Sidebar - Exact Layout */}
+      <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
+        <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
+          <div className="text-[26px] font-bold tracking-tight text-[#000000]">
+            Word<span className="text-[#03d665]">Ai</span>
           </div>
         </div>
-      </header>
-
-      {/* Main Workspace */}
-      <main className="max-w-[1400px] mx-auto mt-8 px-4 sm:px-8 pb-16">
         
-        <div className="bg-white rounded shadow-sm border border-[#f1f1f1] flex flex-col lg:flex-row min-h-[600px] overflow-hidden">
+        <div className="py-4 flex-1">
+          <a href="#" className="flex items-center px-6 py-[12px] bg-[#e1fff7] text-[#03d665] border-r-4 border-[#03d665] font-medium text-[15px]">
+            <span className="mr-3 text-lg">✏️</span> Rewrite Articles
+          </a>
+          <a href="#" className="flex items-center px-6 py-[12px] text-[#585858] hover:text-[#03d665] font-medium text-[15px] transition-colors">
+            <span className="mr-3 text-lg opacity-60">🛡️</span> Avoid AI Detection
+          </a>
+          <a href="#" className="flex items-center px-6 py-[12px] text-[#585858] hover:text-[#03d665] font-medium text-[15px] transition-colors">
+            <span className="mr-3 text-lg opacity-60">📁</span> Saved Articles
+          </a>
+          <a href="#" className="flex items-center px-6 py-[12px] text-[#585858] hover:text-[#03d665] font-medium text-[15px] transition-colors">
+            <span className="mr-3 text-lg opacity-60">⚙️</span> Bulk Rewrite
+          </a>
+          <a href="#" className="flex items-center px-6 py-[12px] text-[#585858] hover:text-[#03d665] font-medium text-[15px] transition-colors">
+            <span className="mr-3 text-lg opacity-60">🔌</span> API
+          </a>
+        </div>
+      </div>
 
-          {/* Left Panel - Input */}
-          <div className="flex-1 flex flex-col relative group border-b lg:border-b-0 lg:border-r border-[#f1f1f1]">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        {/* Top Navbar */}
+        <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-6 z-10 shadow-sm">
+          <div className="flex items-center lg:hidden">
+             <div className="text-[22px] font-bold text-[#000000]">
+              Word<span className="text-[#03d665]">Ai</span>
+            </div>
+          </div>
+          <div className="hidden lg:block"></div>
+          
+          <div className="flex items-center cursor-pointer">
+            <div className="w-[40px] h-[40px] rounded-full bg-[#007bff] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+              S
+            </div>
+          </div>
+        </header>
+
+        {/* Editor Workspace */}
+        <div className="flex-1 overflow-auto p-4 md:p-8 bg-[#fafbfe]">
+          <div className="max-w-[1400px] mx-auto bg-white rounded-[10px] shadow-[0_0_20px_0_rgba(0,0,0,0.05)] border border-[#f1f1f1] overflow-hidden">
             
-            <div className="px-6 py-3 flex items-center justify-between border-b border-[#f1f1f1] bg-[#fafbfe]">
-              <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#000000' }}>Original Article</span>
-              {text && (
-                <button 
-                  onClick={() => setText("")}
-                  className="text-[13px] font-medium px-3 py-1 rounded transition-all" style={{ color: '#585858' }}
-                >
-                  Clear text
-                </button>
-              )}
+            {/* Editor Top Toolbar (Froala Style) */}
+            <div className="h-[50px] bg-white border-b border-[#f1f1f1] flex items-center px-4">
+              <div className="flex items-center space-x-2 text-[#585858]">
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-[#fafbfe] rounded text-[16px] font-bold" title="Bold">B</button>
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-[#fafbfe] rounded text-[16px] italic" title="Italic">I</button>
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-[#fafbfe] rounded text-[16px] underline" title="Underline">U</button>
+                <div className="w-px h-5 bg-[#c2c2c2] mx-2"></div>
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-[#fafbfe] rounded text-[14px]" title="List">📝</button>
+              </div>
             </div>
 
-            <textarea
-              className="flex-1 px-6 py-4 w-full resize-none border-none focus:ring-0 outline-none bg-transparent"
-              style={{ fontSize: '14px', lineHeight: '1.8', letterSpacing: '1px', color: '#585858' }}
-              placeholder="Enter your text here"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            
-            <div className="px-6 py-4 bg-[#fafbfe] border-t border-[#f1f1f1] flex flex-col xl:flex-row xl:items-center justify-between gap-4 mt-auto">
+            <div className="flex flex-col lg:flex-row min-h-[500px]">
               
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="text-[13px] font-medium" style={{ color: '#585858' }}>
-                  <span className="font-bold" style={{ color: wordCount > 0 ? '#1bb3b6' : '#585858' }}>{wordCount}</span> words
-                </div>
+              {/* Left Side: Input */}
+              <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[#f1f1f1] relative">
                 
-                <div className="h-4 w-px bg-[#c2c2c2] hidden sm:block"></div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] hidden sm:block" style={{ color: '#585858' }}>Tone:</span>
-                  <select
-                    className="text-[13px] bg-transparent border border-[#e1e1e1] rounded px-2 py-1 focus:outline-none cursor-pointer"
-                    style={{ color: '#000000' }}
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value)}
+                <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                   <button 
+                    onClick={() => setText("")}
+                    className="w-[35px] h-[35px] bg-white border border-[#f1f1f1] rounded-[7px] shadow-sm flex items-center justify-center hover:bg-[#fafbfe] text-gray-500 hover:text-red-500"
+                    title="Clear"
                   >
-                    <option value="Professional">Regular</option>
-                    <option value="Casual">More Casual</option>
-                    <option value="Fluent">More Conservative</option>
-                    <option value="Creative">More Adventurous</option>
-                  </select>
+                    ✖
+                  </button>
+                </div>
+
+                <textarea
+                  className="flex-1 p-6 w-full resize-none border-none outline-none bg-transparent"
+                  style={{ fontSize: '14px', lineHeight: '1.8', letterSpacing: '1px', color: '#585858', fontFamily: '"Poppins", sans-serif' }}
+                  placeholder="Enter your text here"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                />
+                
+                {/* Word Count */}
+                <div className="px-6 py-2 text-[12px] text-[#c2c2c2] font-medium border-t border-[#f1f1f1]">
+                  Words: {wordCount}
                 </div>
               </div>
-              
-              <button
-                onClick={handleRewrite}
-                disabled={loading || !text}
-                className={`px-8 py-2 rounded text-[14px] font-medium text-white transition-all flex items-center justify-center gap-2 ${
-                  loading || !text
-                    ? "cursor-not-allowed opacity-50"
-                    : "hover:opacity-90"
-                }`}
-                style={{ backgroundColor: '#1bb3b6' }}
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Processing...
-                  </>
-                ) : (
-                  "Rewrite"
-                )}
-              </button>
-            </div>
-          </div>
 
-          {/* Right Panel - Output */}
-          <div className="flex-1 flex flex-col bg-white">
-            
-            <div className="px-6 py-3 flex items-center justify-between border-b border-[#f1f1f1] bg-[#fafbfe]">
-              <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#1bb3b6' }}>Rewritten Article</span>
-              
-              {result && (
-                <button
-                  onClick={handleCopy}
-                  className="text-[13px] font-medium px-3 py-1 rounded border transition-all flex items-center gap-1.5"
-                  style={{ color: '#585858', borderColor: '#f1f1f1', backgroundColor: '#ffffff' }}
-                >
-                  {copied ? (
-                    <span className="flex items-center gap-1" style={{ color: '#1bb3b6' }}>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                      Copied
-                    </span>
+              {/* Right Side: Output */}
+              <div className="flex-1 flex flex-col relative bg-[#fafbfe]">
+                
+                 {result && (
+                  <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                    <button 
+                      onClick={handleCopy}
+                      className="w-[35px] h-[35px] bg-white border border-[#f1f1f1] rounded-[7px] shadow-sm flex items-center justify-center hover:bg-[#fafbfe] text-[#585858] hover:text-[#03d665]"
+                      title="Copy to Clipboard"
+                    >
+                      📋
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex-1 p-6 overflow-y-auto">
+                  {result ? (
+                    <div 
+                      className="whitespace-pre-wrap outline-none" 
+                      style={{ fontSize: '14px', lineHeight: '1.8', letterSpacing: '1px', color: '#585858', fontFamily: '"Poppins", sans-serif' }}
+                    >
+                      {result}
+                    </div>
                   ) : (
-                    <span className="flex items-center gap-1 hover:text-[#1bb3b6]">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                      Copy
-                    </span>
+                    <div className="h-full flex flex-col items-center justify-center text-[#c2c2c2] select-none">
+                    </div>
                   )}
-                </button>
-              )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Controls Area */}
+            <div className="bg-white border-t border-[#f1f1f1] p-6">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                
+                <div className="flex-1 w-full max-w-md">
+                   <div className="mb-2 text-[14px] font-bold text-[#000000]">Settings:</div>
+                   <div className="flex items-center justify-between text-[12px] text-[#585858] mb-1">
+                      <span>More Conservative</span>
+                      <span>Regular</span>
+                      <span>More Adventurous</span>
+                   </div>
+                   <select 
+                      className="w-full h-[8px] bg-[#f1f1f1] rounded-lg appearance-none cursor-pointer outline-none border-none text-transparent"
+                      style={{
+                        background: tone === 'Fluent' ? 'linear-gradient(90deg, #03d665 0%, #f1f1f1 0%)' :
+                                    tone === 'Regular' ? 'linear-gradient(90deg, #03d665 50%, #f1f1f1 50%)' :
+                                    'linear-gradient(90deg, #03d665 100%, #f1f1f1 100%)'
+                      }}
+                      value={tone}
+                      onChange={(e) => setTone(e.target.value)}
+                   >
+                      <option value="Fluent">Conservative</option>
+                      <option value="Regular">Regular</option>
+                      <option value="Creative">Adventurous</option>
+                   </select>
+                </div>
+
+                <div className="w-full md:w-auto text-right">
+                  <button
+                    onClick={handleRewrite}
+                    disabled={loading || !text}
+                    className={`w-full md:w-[150px] h-[50px] rounded-[7px] text-[16px] font-medium text-white transition-colors ${
+                      loading || !text ? "opacity-50 cursor-not-allowed" : "hover:bg-[#02a64e]"
+                    }`}
+                    style={{ backgroundColor: '#03d665' }}
+                  >
+                    {loading ? "..." : "Rewrite"}
+                  </button>
+                </div>
+              </div>
             </div>
             
-            <div className="flex-1 px-6 py-4 overflow-y-auto">
-              {result ? (
-                <div className="whitespace-pre-wrap outline-none pb-6" style={{ fontSize: '14px', lineHeight: '1.8', letterSpacing: '1px', color: '#585858' }}>
-                  {result}
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center select-none pb-10" style={{ color: '#c2c2c2' }}>
-                  <p className="text-[14px]">Your rewritten text will appear here.</p>
-                </div>
-              )}
-            </div>
-            
-            {/* Empty footer area to match the left side structure height */}
-            <div className="px-6 py-4 bg-[#fafbfe] border-t border-[#f1f1f1] min-h-[65px]"></div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
