@@ -4,8 +4,8 @@ import { useState } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 
 export default function Dashboard() {
-  const { user } = useUser(); // Clerk থেকে ইউজারের ইনফো নেওয়া
-  const userId = user ? user.id : "guest";
+  // Clerk থেকে ইউজারের ইনফো এবং 'লোড হচ্ছে কি না' সেই স্টেট নিচ্ছি
+  const { isLoaded, user } = useUser(); 
 
   const [text, setText] = useState("");
   const [sliderValue, setSliderValue] = useState(2); 
@@ -18,6 +18,17 @@ export default function Dashboard() {
   const [mode, setMode] = useState("rewrite"); 
   const [creditsLeft, setCreditsLeft] = useState("5");
 
+  // 🚨 আসল ম্যাজিক: ডেটা লোড না হওয়া পর্যন্ত সাদা স্ক্রিনের বদলে একটি সুন্দর লোডার দেখাবে!
+  if (!isLoaded) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#fafbfe]">
+         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#03d665]"></div>
+      </div>
+    );
+  }
+
+  // ডেটা লোড হয়ে গেলে ইউজারের আইডি সেট করবে
+  const userId = user ? user.id : "guest";
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
   const getTone = (value) => {
