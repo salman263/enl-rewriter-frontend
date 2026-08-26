@@ -21,7 +21,7 @@ export default function LandingPage() {
           <Link href="#pricing" className="hover:text-[#03d665] transition-colors">Pricing</Link>
         </div>
         <div className="flex items-center gap-6">
-          <Link href="/login" className="font-medium text-[15px] hover:text-[#03d665] transition-colors hidden sm:block">
+          <Link href="/sign-in" className="font-medium text-[15px] hover:text-[#03d665] transition-colors hidden sm:block">
             Login
           </Link>
           <Link 
