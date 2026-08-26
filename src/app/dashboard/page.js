@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation"; // 🚀 নতুন রাউটার যুক্ত করা হয়েছে
 
 export default function Dashboard() {
-  // Clerk থেকে ইউজারের ইনফো এবং 'লোড হচ্ছে কি না' সেই স্টেট নিচ্ছি
   const { isLoaded, user } = useUser(); 
+  const router = useRouter(); // 🚀 রাউটার
 
   const [text, setText] = useState("");
   const [sliderValue, setSliderValue] = useState(2); 
@@ -18,8 +19,15 @@ export default function Dashboard() {
   const [mode, setMode] = useState("rewrite"); 
   const [creditsLeft, setCreditsLeft] = useState("5");
 
-  // 🚨 আসল ম্যাজিক: ডেটা লোড না হওয়া পর্যন্ত সাদা স্ক্রিনের বদলে একটি সুন্দর লোডার দেখাবে!
-  if (!isLoaded) {
+  // 🚨 ক্লায়েন্ট-সাইড সিকিউরিটি চেক: লগইন না থাকলে sign-in পেজে পাঠাবে
+  useEffect(() => {
+    if (isLoaded && !user) {
+      router.push("/sign-in");
+    }
+  }, [isLoaded, user, router]);
+
+  // ডেটা লোড না হওয়া পর্যন্ত লোডিং দেখাবে (সাদা স্ক্রিনের বদলে)
+  if (!isLoaded || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#fafbfe]">
          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#03d665]"></div>
@@ -27,8 +35,7 @@ export default function Dashboard() {
     );
   }
 
-  // ডেটা লোড হয়ে গেলে ইউজারের আইডি সেট করবে
-  const userId = user ? user.id : "guest";
+  const userId = user.id;
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
   const getTone = (value) => {
