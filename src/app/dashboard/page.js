@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { UserButton, useAuth } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 
 export default function Dashboard() {
-  const { userId } = useAuth(); // Clerk থেকে ইউজারের আইডি নিয়ে আসছি
-  
+  const { user } = useUser(); // Clerk থেকে ইউজারের ইনফো নেওয়া
+  const userId = user ? user.id : "guest";
+
   const [text, setText] = useState("");
   const [sliderValue, setSliderValue] = useState(2); 
   const [numRewrites, setNumRewrites] = useState(1); 
@@ -15,7 +16,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState("rewrite"); 
-  const [creditsLeft, setCreditsLeft] = useState("5 (Free)"); // ডিফল্ট ক্রেডিট
+  const [creditsLeft, setCreditsLeft] = useState("5");
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
@@ -47,7 +48,7 @@ export default function Dashboard() {
           tone: getTone(sliderValue),
           num_rewrites: numRewrites,
           mode: mode,
-          userId: userId || "guest" // ইউজারের আসল আইডি পাঠানো হচ্ছে
+          userId: userId
         }),
       });
 
@@ -58,10 +59,8 @@ export default function Dashboard() {
       } else if (data.rewrites && data.rewrites.length > 0) {
         setResults(data.rewrites);
         setActiveTab(0);
-        
-        // ব্যাকএন্ড থেকে আসা আপডেট হওয়া ক্রেডিট সেট করা
         if(data.credits_left !== undefined) {
-          setCreditsLeft(data.credits_left);
+          setCreditsLeft(String(data.credits_left));
         }
       } else {
         setResults(["No result found."]);
@@ -131,7 +130,6 @@ export default function Dashboard() {
             {mode === "rewrite" ? "Semantic SEO Rewriter" : "AI Detection Humanizer"}
           </div>
           
-          {/* 🚀 Credits Badge and Clerk Profile Button */}
           <div className="flex items-center gap-6">
             <div className="hidden sm:flex items-center bg-[#f1f1f1] px-4 py-1.5 rounded-full text-[13px] font-bold text-[#585858]">
               Credits: <span className="text-[#03d665] ml-1">{creditsLeft}</span>
