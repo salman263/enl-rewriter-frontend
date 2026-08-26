@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation"; // 🚀 নতুন রাউটার যুক্ত করা হয়েছে
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const { isLoaded, user } = useUser(); 
-  const router = useRouter(); // 🚀 রাউটার
+  const router = useRouter(); 
 
   const [text, setText] = useState("");
   const [sliderValue, setSliderValue] = useState(2); 
@@ -17,12 +17,22 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState("rewrite"); 
-  const [creditsLeft, setCreditsLeft] = useState("5");
+  const [creditsLeft, setCreditsLeft] = useState("..."); // 🆕 পেজ লোড হলে প্রথমে ... দেখাবে
 
-  // 🚨 ক্লায়েন্ট-সাইড সিকিউরিটি চেক: লগইন না থাকলে sign-in পেজে পাঠাবে
+  // 🚨 ক্লায়েন্ট-সাইড সিকিউরিটি এবং রিয়েল-টাইম ক্রেডিট ফেচিং
   useEffect(() => {
     if (isLoaded && !user) {
       router.push("/sign-in");
+    } else if (isLoaded && user) {
+      // 🚀 পেজ লোড হওয়ার সাথে সাথে ডাটাবেস থেকে ইউজারের আসল ক্রেডিট নিয়ে আসবে!
+      fetch(`https://enl-rewriter-backend.onrender.com/api/user/${user.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.credits !== undefined) {
+            setCreditsLeft(String(data.credits));
+          }
+        })
+        .catch((err) => console.error("Failed to fetch credits"));
     }
   }, [isLoaded, user, router]);
 
