@@ -34,30 +34,65 @@ export default function LandingPage() {
       </header>
 
       {/* 2. Hero Section */}
-      <section className="bg-[#fafbfe] pt-20 pb-24 px-6 lg:px-16 border-b border-[#f1f1f1]">
+      <section className="bg-[#fafbfe] pt-20 pb-24 px-6 lg:px-16 border-b border-[#f1f1f1] overflow-hidden">
         <div className="max-w-[1200px] mx-auto flex flex-col-reverse lg:flex-row items-center gap-12">
-          <div className="flex-1 text-center lg:text-left">
+          <div className="flex-1 text-center lg:text-left z-10">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#000000] tracking-tight leading-[1.15] mb-6">
               Rewrite Content That Ranks & <span className="text-[#03d665]">Bypasses AI.</span>
             </h1>
-            <p className="text-lg md:text-xl mb-10 text-[#585858] leading-relaxed">
+            <p className="text-lg md:text-xl mb-10 text-[#585858] leading-relaxed max-w-2xl mx-auto lg:mx-0">
               Powered by advanced NLP algorithms, ZeroWordAi transforms ordinary text into high-ranking, human-like content that Google loves and detectors can't catch.
             </p>
             <Link 
               href="/dashboard" 
-              className="inline-block px-10 py-4 bg-[#03d665] hover:bg-[#02a64e] text-white text-[16px] font-bold rounded transition-all shadow-md"
+              className="inline-block px-10 py-4 bg-[#03d665] hover:bg-[#02a64e] text-white text-[16px] font-bold rounded transition-all shadow-md hover:shadow-lg transform hover:-translate-y-1"
             >
               Start Rewriting Now
             </Link>
             <p className="mt-4 text-[13px] text-gray-400 font-medium">No credit card required • Free trial included</p>
           </div>
-          <div className="flex-1 relative w-full max-w-lg mx-auto">
-            <div className="w-full h-[350px] bg-white rounded-xl shadow-2xl border border-[#f1f1f1] flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#e1fff7] to-white opacity-50"></div>
-              <div className="text-center z-10 px-6">
-                <div className="text-[#03d665] text-5xl mb-4">🚀</div>
-                <h3 className="text-xl font-bold text-[#000000]">Smart AI Engine</h3>
-                <p className="text-[14px] mt-2">Analyzes context, injects LSI keywords, and humanizes tone.</p>
+          
+          {/* MODERN UI MOCKUP (Replaced the Box) */}
+          <div className="flex-1 relative w-full max-w-lg mx-auto z-10 perspective-1000">
+            {/* Background Glow */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-r from-[#e1fff7] to-[#b4f0dc] rounded-full blur-3xl opacity-50 z-0"></div>
+            
+            {/* App Window UI */}
+            <div className="w-full bg-white rounded-xl shadow-2xl border border-[#f1f1f1] overflow-hidden transform md:rotate-2 hover:rotate-0 transition-transform duration-500 relative z-10">
+              {/* Mac-style Top Bar */}
+              <div className="bg-[#fafbfe] px-4 py-3 border-b border-[#f1f1f1] flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
+                <div className="ml-4 text-[12px] text-gray-400 font-medium">ZeroWordAi Workspace</div>
+              </div>
+              
+              {/* Editor Content */}
+              <div className="p-6 text-left">
+                <div className="mb-4">
+                  <div className="text-[11px] font-bold text-[#c2c2c2] uppercase tracking-wider mb-2">Original Text</div>
+                  <div className="text-[14px] text-[#585858] bg-[#fafbfe] p-4 rounded border border-[#f1f1f1] line-clamp-2">
+                    AI tools can write things fast, but they usually sound like robots and get penalized by Google algorithms.
+                  </div>
+                </div>
+                
+                <div className="flex justify-center mb-4 relative">
+                  <div className="absolute top-1/2 left-0 w-full h-px bg-[#f1f1f1] z-0"></div>
+                  <div className="bg-[#e1fff7] text-[#03d665] px-4 py-1.5 rounded-full text-[12px] font-bold shadow-sm relative z-10 flex items-center gap-2">
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Humanizing...
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] font-bold text-[#03d665] uppercase tracking-wider mb-2 flex justify-between">
+                    <span>Rewritten Output</span>
+                    <span className="bg-[#e1fff7] px-2 rounded text-[10px]">✨ Highlights On</span>
+                  </div>
+                  <div className="text-[14px] text-[#585858] bg-white p-4 rounded border border-[#03d665] shadow-[0_0_15px_rgba(3,214,101,0.1)] leading-relaxed">
+                    While <span className="text-[#03d665] bg-[#e1fff7] font-medium px-1 rounded">automated platforms</span> accelerate content creation, preserving a <span className="text-[#03d665] bg-[#e1fff7] font-medium px-1 rounded">genuine human flow</span> is crucial to <span className="text-[#03d665] bg-[#e1fff7] font-medium px-1 rounded">bypass strict search penalties</span>.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
