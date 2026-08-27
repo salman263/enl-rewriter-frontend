@@ -4,28 +4,26 @@ import { useState, useEffect } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
-// 🚨 এখানে আপনার ইমেইল দেবেন
+// 🚨 এখানে আপনার ইমেইল দিন
 const ADMIN_EMAIL = "seotoolshero@gmail.com"; 
 
 export default function AdminDashboard() {
   const { isLoaded, user } = useUser();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState("plans"); 
+  const [activeTab, setActiveTab] = useState("users"); 
   const [loading, setLoading] = useState(true);
   
   const [usersList, setUsersList] = useState([]);
   const [plansList, setPlansList] = useState([]);
   const [analytics, setAnalytics] = useState({ total_users: 0, total_rewrites: 0, total_words_processed: 0 });
   
-  // User Modal 
   const [selectedUser, setSelectedUser] = useState(null);
   const [editPlan, setEditPlan] = useState("Starter");
   const [editSeoWords, setEditSeoWords] = useState(0);
   const [editBypassWords, setEditBypassWords] = useState(0);
   const [isBanned, setIsBanned] = useState(false);
 
-  // Plan Modal
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [planForm, setPlanForm] = useState({ planId: "", name: "", price: 0, seo_words: 0, bypass_words: 0, features: "", sort_order: 1 });
 
@@ -47,7 +45,6 @@ export default function AdminDashboard() {
     }
   }, [isLoaded, user, router]);
 
-  // --- USER ACTIONS ---
   const handleSaveUser = async () => {
     try {
       await fetch("https://enl-rewriter-backend.onrender.com/api/admin/super-update", {
@@ -67,14 +64,24 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  // --- PLAN ACTIONS ---
+  // 🚀 SMART PLAN SELECTION LOGIC
+  const handlePlanChange = (e) => {
+    const selectedPlanName = e.target.value;
+    setEditPlan(selectedPlanName);
+    
+    // যে প্ল্যান সিলেক্ট করা হয়েছে তার লিমিট ডেটাবেস থেকে খুঁজে বের করা
+    const matchedPlan = plansList.find(p => p.name === selectedPlanName);
+    if (matchedPlan) {
+      setEditSeoWords(matchedPlan.seo_words);
+      setEditBypassWords(matchedPlan.bypass_words);
+    }
+  };
+
   const handleSavePlan = async () => {
     try {
       const generatedPlanId = planForm.planId || planForm.name.toLowerCase().replace(/\s+/g, '-') + '-' + Math.floor(Math.random() * 1000);
       const featureArray = planForm.features.split(",").map(f => f.trim()).filter(f => f);
-      
       const payload = { ...planForm, planId: generatedPlanId, features: featureArray };
-      
       await fetch("https://enl-rewriter-backend.onrender.com/api/admin/plans", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -228,21 +235,24 @@ export default function AdminDashboard() {
             <h2 className="text-lg font-extrabold text-[#000] mb-4">Manage Limits: {selectedUser.userId}</h2>
             <div className="flex gap-4 mb-4">
               <div className="flex-1"><label className="text-xs font-bold uppercase">Plan</label>
-                <select value={editPlan} onChange={e => setEditPlan(e.target.value)} className="w-full border-2 p-2.5 rounded-xl font-bold">
+                
+                {/* 🚀 SMART PLAN SELECTOR */}
+                <select value={editPlan} onChange={handlePlanChange} className="w-full border-2 p-2.5 rounded-xl font-bold">
                   {plansList.map(p => <option key={p.planId} value={p.name}>{p.name}</option>)}
                 </select>
+
               </div>
               <div className="flex-1"><label className="text-xs font-bold uppercase">Status</label>
                 <button onClick={() => setIsBanned(!isBanned)} className={`w-full p-2.5 rounded-xl font-bold border-2 ${isBanned ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{isBanned ? '🚫 BANNED' : '✅ ACTIVE'}</button>
               </div>
             </div>
             <div className="bg-[#f8f9fc] p-4 rounded-xl border flex gap-4 items-center mb-6">
-              <div className="flex-1"><span className="text-[10px] uppercase font-bold text-blue-500">SEO Words</span><input type="number" value={editSeoWords} onChange={e => setEditSeoWords(e.target.value)} className="w-full border-2 p-2 rounded-lg font-bold text-center" /></div>
-              <div className="flex-1"><span className="text-[10px] uppercase font-bold text-[#03d665]">Bypass Words</span><input type="number" value={editBypassWords} onChange={e => setEditBypassWords(e.target.value)} className="w-full border-2 p-2 rounded-lg font-bold text-center" /></div>
+              <div className="flex-1"><span className="text-[10px] uppercase font-bold text-blue-500">SEO Words</span><input type="number" value={editSeoWords} onChange={e => setEditSeoWords(e.target.value)} className="w-full border-2 p-2 rounded-lg font-bold text-center text-black" /></div>
+              <div className="flex-1"><span className="text-[10px] uppercase font-bold text-[#03d665]">Bypass Words</span><input type="number" value={editBypassWords} onChange={e => setEditBypassWords(e.target.value)} className="w-full border-2 p-2 rounded-lg font-bold text-center text-black" /></div>
             </div>
             <div className="flex justify-between items-center">
               <button onClick={handleDeleteUser} className="text-red-500 font-bold text-sm underline">Delete User</button>
-              <div className="flex gap-3"><button onClick={() => setSelectedUser(null)} className="px-5 py-2 bg-gray-200 rounded-xl font-bold">Cancel</button><button onClick={handleSaveUser} className="px-6 py-2 bg-[#03d665] text-white rounded-xl font-bold">Save</button></div>
+              <div className="flex gap-3"><button onClick={() => setSelectedUser(null)} className="px-5 py-2 bg-gray-200 rounded-xl font-bold text-black">Cancel</button><button onClick={handleSaveUser} className="px-6 py-2 bg-[#03d665] text-white rounded-xl font-bold">Save</button></div>
             </div>
           </div>
         </div>
