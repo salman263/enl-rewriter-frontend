@@ -4,12 +4,16 @@ import { useState, useEffect } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
+// 🚨 এখানে আপনার নিজের ইমেইল দিন (শুধুমাত্র এই ইমেইলটিই অ্যাডমিন প্যানেলে ঢুকতে পারবে)
+const ADMIN_EMAIL = "seotoolshero@gmail.com"; 
+
 export default function AdminDashboard() {
   const { isLoaded, user } = useUser();
   const router = useRouter();
   
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("users"); // Tab System
   
   // Advanced Modal States
   const [selectedUser, setSelectedUser] = useState(null);
@@ -28,9 +32,21 @@ export default function AdminDashboard() {
       .catch(() => setLoading(false));
   };
 
+  // 🛡️ SECURITY CHECK: শুধু অ্যাডমিন ঢুকতে পারবে
   useEffect(() => {
-    if (isLoaded && !user) router.push("/sign-in");
-    else if (isLoaded && user) fetchUsers();
+    if (isLoaded) {
+      if (!user) {
+        router.push("/sign-in");
+      } else {
+        const userEmail = user.primaryEmailAddress?.emailAddress;
+        if (userEmail !== ADMIN_EMAIL) {
+          alert("Access Denied! You are not an Admin.");
+          router.push("/dashboard"); // অন্য ইউজার হলে ড্যাশবোর্ডে কিক করবে
+        } else {
+          fetchUsers();
+        }
+      }
+    }
   }, [isLoaded, user, router]);
 
   const openAdminModal = (u) => {
@@ -43,19 +59,11 @@ export default function AdminDashboard() {
 
   const handleSaveUser = async () => {
     try {
-      const finalCredits = addCreditAmount 
-        ? parseInt(editCredits) + parseInt(addCreditAmount) 
-        : parseInt(editCredits);
-
+      const finalCredits = addCreditAmount ? parseInt(editCredits) + parseInt(addCreditAmount) : parseInt(editCredits);
       const res = await fetch("https://enl-rewriter-backend.onrender.com/api/admin/super-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          userId: selectedUser.userId, 
-          plan: editPlan, 
-          credits: finalCredits,
-          banned: isBanned
-        }),
+        body: JSON.stringify({ userId: selectedUser.userId, plan: editPlan, credits: finalCredits, banned: isBanned }),
       });
       const data = await res.json();
       if (data.success) {
@@ -63,28 +71,21 @@ export default function AdminDashboard() {
         setSelectedUser(null);
         fetchUsers();
       }
-    } catch (err) {
-      alert("Update failed!");
-    }
+    } catch (err) { alert("Update failed!"); }
   };
 
   const handleDeleteUser = async () => {
-    const confirmDelete = window.confirm("Are you sure you want to permanently delete this user from the database?");
+    const confirmDelete = window.confirm("Are you sure you want to permanently delete this user?");
     if (!confirmDelete) return;
-
     try {
-      const res = await fetch(`https://enl-rewriter-backend.onrender.com/api/admin/delete-user/${selectedUser.userId}`, {
-        method: "DELETE"
-      });
+      const res = await fetch(`https://enl-rewriter-backend.onrender.com/api/admin/delete-user/${selectedUser.userId}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        alert("User completely removed from database!");
+        alert("User deleted!");
         setSelectedUser(null);
         fetchUsers();
       }
-    } catch (err) {
-      alert("Error deleting user.");
-    }
+    } catch (err) { alert("Error deleting user."); }
   };
 
   if (!isLoaded || loading) return <div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div></div>;
@@ -101,103 +102,115 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="flex-1 p-8 max-w-7xl mx-auto w-full">
-        <div className="bg-white rounded-2xl border border-[#f1f1f1] shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-[#f1f1f1] flex justify-between items-center bg-[#fafbfe]">
-            <h3 className="font-bold text-lg text-[#000000]">Total Users: {usersList.length}</h3>
-          </div>
+      <div className="flex-1 p-8 max-w-7xl mx-auto w-full flex gap-8">
+        
+        {/* Sidebar Menu for Admin */}
+        <div className="w-[250px] bg-white rounded-2xl border border-[#f1f1f1] shadow-sm p-4 h-fit">
+          <button onClick={() => setActiveTab("users")} className={`w-full text-left px-4 py-3 rounded-xl font-bold mb-2 transition ${activeTab === "users" ? "bg-[#03d665] text-white" : "hover:bg-[#f1f1f1] text-[#000]"}`}>👥 User Management</button>
+          <button onClick={() => setActiveTab("plans")} className={`w-full text-left px-4 py-3 rounded-xl font-bold mb-2 transition ${activeTab === "plans" ? "bg-[#03d665] text-white" : "hover:bg-[#f1f1f1] text-[#000]"}`}>💳 Plan Management</button>
+          <button onClick={() => setActiveTab("analytics")} className={`w-full text-left px-4 py-3 rounded-xl font-bold transition ${activeTab === "analytics" ? "bg-[#03d665] text-white" : "hover:bg-[#f1f1f1] text-[#000]"}`}>📊 Analytics & Reports</button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1">
           
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-white text-xs uppercase tracking-wider border-b border-[#f1f1f1]">
-                <th className="p-4 pl-6">User ID</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Plan</th>
-                <th className="p-4">Credits</th>
-                <th className="p-4 pr-6 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm divide-y divide-[#f1f1f1]">
-              {usersList.map((u, idx) => (
-                <tr key={idx} className="hover:bg-[#fafbfe] transition">
-                  <td className="p-4 pl-6 font-mono text-xs font-bold text-[#000000]">{u.userId}</td>
-                  <td className="p-4">
-                    {u.banned ? <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold">BANNED</span> : <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">ACTIVE</span>}
-                  </td>
-                  <td className="p-4 font-bold">{u.plan || "Free"}</td>
-                  <td className="p-4 font-extrabold text-[#03d665]">{u.credits}</td>
-                  <td className="p-4 pr-6 text-right">
-                    <button onClick={() => openAdminModal(u)} className="px-4 py-2 bg-[#000000] text-white text-xs font-bold rounded-lg shadow hover:bg-gray-800 transition">
-                      Manage User
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* TAB 1: USERS */}
+          {activeTab === "users" && (
+            <div className="bg-white rounded-2xl border border-[#f1f1f1] shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-[#f1f1f1] flex justify-between items-center bg-[#fafbfe]">
+                <h3 className="font-bold text-lg text-[#000000]">Total Registered Users: {usersList.length}</h3>
+              </div>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white text-xs uppercase tracking-wider border-b border-[#f1f1f1]">
+                    <th className="p-4 pl-6">User ID</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Plan</th>
+                    <th className="p-4 pr-6 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm divide-y divide-[#f1f1f1]">
+                  {usersList.map((u, idx) => (
+                    <tr key={idx} className="hover:bg-[#fafbfe] transition">
+                      <td className="p-4 pl-6 font-mono text-xs font-bold text-[#000000]">{u.userId}</td>
+                      <td className="p-4">{u.banned ? <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold">BANNED</span> : <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">ACTIVE</span>}</td>
+                      <td className="p-4 font-bold">{u.plan || "Free"}</td>
+                      <td className="p-4 pr-6 text-right">
+                        <button onClick={() => openAdminModal(u)} className="px-4 py-2 bg-[#000000] text-white text-xs font-bold rounded-lg shadow hover:bg-gray-800 transition">Manage</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* TAB 2: PLANS (Coming Soon Template) */}
+          {activeTab === "plans" && (
+             <div className="bg-white p-12 rounded-2xl border border-[#f1f1f1] shadow-sm text-center">
+                <div className="text-4xl mb-4">⚙️</div>
+                <h2 className="text-2xl font-bold text-[#000]">Dynamic Plan Management</h2>
+                <p className="text-[#585858] mt-2">Create, edit, and delete pricing plans directly from here. (Coming in Next Update)</p>
+             </div>
+          )}
+
+          {/* TAB 3: ANALYTICS (Coming Soon Template) */}
+          {activeTab === "analytics" && (
+             <div className="bg-white p-12 rounded-2xl border border-[#f1f1f1] shadow-sm text-center">
+                <div className="text-4xl mb-4">📈</div>
+                <h2 className="text-2xl font-bold text-[#000]">Advanced Analytics & Reports</h2>
+                <p className="text-[#585858] mt-2">Track daily active users, total AI generations, and revenue. (Coming in Next Update)</p>
+             </div>
+          )}
+
         </div>
       </div>
 
-      {/* 🚀 ULTIMATE USER MANAGEMENT MODAL */}
+      {/* Edit User Modal (Same as before) */}
       {selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-white w-[500px] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            
             <div className="bg-[#fafbfe] px-6 py-4 border-b border-[#f1f1f1] flex justify-between items-center">
-              <h2 className="text-lg font-extrabold text-[#000000]">Manage: <span className="text-sm font-mono font-medium text-[#585858] ml-2">{selectedUser.userId}</span></h2>
+              <h2 className="text-lg font-extrabold text-[#000000]">Manage User</h2>
               <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-black font-bold text-xl">&times;</button>
             </div>
-
             <div className="p-6 space-y-6">
-              
-              {/* Plan & Ban Control */}
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#585858] mb-2">Subscription Plan</label>
-                  <select value={editPlan} onChange={(e) => setEditPlan(e.target.value)} className="w-full border-2 border-[#f1f1f1] p-2.5 rounded-xl focus:border-[#03d665] outline-none font-bold text-[#000]">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#585858] mb-2">Plan</label>
+                  <select value={editPlan} onChange={(e) => setEditPlan(e.target.value)} className="w-full border-2 border-[#f1f1f1] p-2.5 rounded-xl outline-none font-bold text-[#000]">
                     <option value="Free">Free Plan</option>
                     <option value="Pro">Pro Plan</option>
                     <option value="Enterprise">Enterprise Plan</option>
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#585858] mb-2">Account Status</label>
-                  <button 
-                    onClick={() => setIsBanned(!isBanned)} 
-                    className={`w-full p-2.5 rounded-xl font-bold border-2 transition ${isBanned ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}
-                  >
-                    {isBanned ? '🚫 BANNED (Click to Unban)' : '✅ ACTIVE (Click to Ban)'}
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#585858] mb-2">Status</label>
+                  <button onClick={() => setIsBanned(!isBanned)} className={`w-full p-2.5 rounded-xl font-bold border-2 transition ${isBanned ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                    {isBanned ? '🚫 BANNED' : '✅ ACTIVE'}
                   </button>
                 </div>
               </div>
-
-              {/* Credit Control Engine */}
               <div className="bg-[#f8f9fc] p-4 rounded-xl border border-[#eef0f5]">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#585858] mb-3">Credit Management Engine</label>
                 <div className="flex gap-4 items-center">
                   <div className="flex-1">
-                    <span className="text-[10px] uppercase font-bold text-gray-400">Set Exact Credits (=)</span>
-                    <input type="number" value={editCredits} onChange={(e) => setEditCredits(e.target.value)} className="w-full border-2 border-gray-200 p-2 rounded-lg font-bold text-center outline-none focus:border-[#03d665]" />
+                    <span className="text-[10px] uppercase font-bold text-gray-400">Set Credits (=)</span>
+                    <input type="number" value={editCredits} onChange={(e) => setEditCredits(e.target.value)} className="w-full border-2 border-gray-200 p-2 rounded-lg font-bold text-center outline-none" />
                   </div>
                   <div className="text-xl font-extrabold text-gray-300 mt-4">+</div>
                   <div className="flex-1">
-                    <span className="text-[10px] uppercase font-bold text-gray-400">Add Bonus Credits (+)</span>
-                    <input type="number" placeholder="+ Add Amount" value={addCreditAmount} onChange={(e) => setAddCreditAmount(e.target.value)} className="w-full border-2 border-gray-200 p-2 rounded-lg font-bold text-center outline-none focus:border-[#03d665] placeholder-gray-300" />
+                    <span className="text-[10px] uppercase font-bold text-gray-400">Add Bonus (+)</span>
+                    <input type="number" placeholder="+ Add Amount" value={addCreditAmount} onChange={(e) => setAddCreditAmount(e.target.value)} className="w-full border-2 border-gray-200 p-2 rounded-lg font-bold text-center outline-none" />
                   </div>
                 </div>
               </div>
-              
-              {/* Danger Zone */}
               <div className="border-t border-[#f1f1f1] pt-6 flex justify-between items-center">
-                <button onClick={handleDeleteUser} className="text-red-500 hover:text-red-700 font-bold text-sm underline">
-                  Permanently Delete User
-                </button>
+                <button onClick={handleDeleteUser} className="text-red-500 hover:text-red-700 font-bold text-sm underline">Delete User</button>
                 <div className="flex gap-3">
-                  <button onClick={() => setSelectedUser(null)} className="px-5 py-2.5 bg-[#f1f1f1] text-[#000] rounded-xl font-bold hover:bg-[#e1e1e1]">Cancel</button>
-                  <button onClick={handleSaveUser} className="px-6 py-2.5 bg-[#03d665] text-white rounded-xl font-bold shadow-lg shadow-[#03d665]/30 hover:bg-[#02a64e]">Save Changes</button>
+                  <button onClick={() => setSelectedUser(null)} className="px-5 py-2.5 bg-[#f1f1f1] text-[#000] rounded-xl font-bold">Cancel</button>
+                  <button onClick={handleSaveUser} className="px-6 py-2.5 bg-[#03d665] text-white rounded-xl font-bold">Save</button>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
