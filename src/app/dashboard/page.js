@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   
   // Navigation & Limits State
-  const [mode, setMode] = useState("rewrite"); // Controls Sidebar Tab
+  const [mode, setMode] = useState("rewrite"); 
   const [seoWords, setSeoWords] = useState("...");
   const [bypassWords, setBypassWords] = useState("...");
   const [planName, setPlanName] = useState("...");
@@ -28,6 +28,11 @@ export default function Dashboard() {
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
+
+  // 🚀 Saved Articles States
+  const [savedArticles, setSavedArticles] = useState([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [viewArticle, setViewArticle] = useState(null); // For viewing full saved article
 
   const fetchUserLimits = () => {
     if (user) {
@@ -44,6 +49,17 @@ export default function Dashboard() {
     }
   };
 
+  const fetchSavedArticles = async () => {
+    if (!user) return;
+    setLoadingSaved(true);
+    try {
+      const res = await fetch(`https://enl-rewriter-backend.onrender.com/api/saved-articles/${user.id}`);
+      const data = await res.json();
+      setSavedArticles(data.articles || []);
+    } catch (err) { console.error("Error fetching saved articles"); }
+    setLoadingSaved(false);
+  };
+
   useEffect(() => {
     if (isLoaded && !user) {
       router.push("/sign-in");
@@ -55,6 +71,11 @@ export default function Dashboard() {
       fetchUserLimits();
     }
   }, [isLoaded, user, router]);
+
+  // Fetch saved articles when mode changes to 'saved'
+  useEffect(() => {
+    if (mode === "saved") fetchSavedArticles();
+  }, [mode]);
 
   if (!isLoaded || !user) {
     return (
@@ -128,6 +149,30 @@ export default function Dashboard() {
     }
   };
 
+  // 🚀 Save Generated Article
+  const handleSaveCurrentArticle = async () => {
+    if (!results[activeTab]) return;
+    try {
+      const res = await fetch("https://enl-rewriter-backend.onrender.com/api/saved-articles", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, original_text: text, rewritten_text: results[activeTab], mode: mode })
+      });
+      const data = await res.json();
+      if(data.success) alert("Article saved to your dashboard!");
+      else alert("Failed to save article.");
+    } catch(err) { alert("Network error."); }
+  };
+
+  // 🚀 Delete Saved Article
+  const handleDeleteSavedArticle = async (articleId) => {
+    if(!window.confirm("Delete this saved article?")) return;
+    try {
+      await fetch(`https://enl-rewriter-backend.onrender.com/api/saved-articles/${articleId}`, { method: "DELETE" });
+      setSavedArticles(prev => prev.filter(a => a.articleId !== articleId));
+      if(viewArticle && viewArticle.articleId === articleId) setViewArticle(null);
+    } catch(err) { alert("Failed to delete."); }
+  };
+
   const handleRedeem = async () => {
     if (!couponCode.trim()) return alert("Please enter a valid code");
     setRedeemLoading(true);
@@ -164,7 +209,6 @@ export default function Dashboard() {
     });
   };
 
-  // 🚀 SIDEBAR MENU ITEMS
   const sidebarMenus = [
     { id: "rewrite", icon: "✏️", label: "Rewrite Articles" },
     { id: "avoid_ai", icon: "🛡️", label: "Avoid AI Detection" },
@@ -178,13 +222,11 @@ export default function Dashboard() {
     { id: "support", icon: "🎧", label: "Support" },
   ];
 
-  // 🚀 RENDER CONTENT BASED ON SELECTED TAB
   const renderContent = () => {
     if (mode === "rewrite" || mode === "avoid_ai") {
       return (
         <div className="max-w-[1400px] mx-auto bg-white rounded-[10px] shadow-[0_0_20px_0_rgba(0,0,0,0.05)] border border-[#f1f1f1] overflow-hidden">
           <div className="flex flex-col lg:flex-row min-h-[500px]">
-            {/* Input Area */}
             <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[#f1f1f1] relative">
               <div className="px-6 py-3 flex justify-between bg-[#fafbfe] border-b border-[#f1f1f1]">
                 <span className="text-[13px] font-bold text-[#000000] uppercase">Original Content</span>
@@ -200,7 +242,6 @@ export default function Dashboard() {
               <div className="px-6 py-2 text-[12px] text-[#c2c2c2] font-medium border-t border-[#f1f1f1]">Words: {wordCount}</div>
             </div>
 
-            {/* Output Area */}
             <div className="flex-1 flex flex-col relative bg-[#fafbfe]">
               <div className="px-6 py-3 flex items-center justify-between border-b border-[#f1f1f1] bg-[#fafbfe]">
                 <div className="flex gap-4">
@@ -224,6 +265,10 @@ export default function Dashboard() {
                       onClick={() => setHighlight(!highlight)}
                       className={`text-[12px] font-medium px-2 py-1 rounded border transition-all ${highlight ? 'bg-[#e1fff7] text-[#03d665] border-[#03d665]' : 'bg-white text-[#585858] border-[#f1f1f1]'}`}
                     >✨ Highlights</button>
+                    {/* 🚀 SAVE BUTTON ADDED */}
+                    <button onClick={handleSaveCurrentArticle} className="text-[12px] font-medium px-2 py-1 bg-white border border-[#f1f1f1] rounded hover:text-blue-500">
+                      💾 Save
+                    </button>
                     <button onClick={handleCopy} className="text-[12px] font-medium px-2 py-1 bg-white border border-[#f1f1f1] rounded hover:text-[#03d665]">
                       {copied ? "Copied!" : "Copy"}
                     </button>
@@ -245,7 +290,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Dynamic Bottom Settings */}
           <div className="bg-white border-t border-[#f1f1f1] p-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="w-full md:w-[150px]">
@@ -291,17 +335,70 @@ export default function Dashboard() {
       );
     }
     
-    // 💾 SAVED ARTICLES UI
-    if (mode === "saved") return (
-      <div className="max-w-[1000px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
-        <h2 className="text-2xl font-bold text-black mb-6">Saved Articles</h2>
-        <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-          <div className="text-4xl mb-4">📂</div>
-          <p className="text-gray-500 font-medium">You don't have any saved articles yet.</p>
-          <button className="mt-4 px-6 py-2 bg-[#03d665] text-white rounded font-bold hover:bg-[#02a64e]" onClick={()=>setMode("rewrite")}>Start Rewriting</button>
+    // 💾 REAL SAVED ARTICLES UI
+    if (mode === "saved") {
+      if(viewArticle) {
+        return (
+          <div className="max-w-[1200px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
+            <button onClick={() => setViewArticle(null)} className="mb-4 text-sm font-bold text-gray-500 hover:text-black">&larr; Back to list</button>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-black">Article Details</h2>
+              <div className="flex gap-3">
+                <button onClick={() => {navigator.clipboard.writeText(viewArticle.rewritten_text); alert("Copied!")}} className="px-4 py-2 bg-gray-100 rounded font-bold text-sm">Copy Result</button>
+                <button onClick={() => handleDeleteSavedArticle(viewArticle.articleId)} className="px-4 py-2 bg-red-100 text-red-600 rounded font-bold text-sm">Delete</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="p-6 bg-gray-50 rounded-xl border">
+                <div className="text-xs font-bold text-gray-400 uppercase mb-4">Original Text</div>
+                <div className="whitespace-pre-wrap text-sm text-gray-700">{viewArticle.original_text}</div>
+              </div>
+              <div className="p-6 bg-[#fafbfe] rounded-xl border border-[#e1fff7]">
+                <div className="text-xs font-bold text-[#03d665] uppercase mb-4">Rewritten Result ({viewArticle.mode === "rewrite" ? "SEO" : "AI Bypass"})</div>
+                <div className="whitespace-pre-wrap text-sm text-black">{viewArticle.rewritten_text}</div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      return (
+        <div className="max-w-[1000px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
+          <h2 className="text-2xl font-bold text-black mb-6">Saved Articles</h2>
+          {loadingSaved ? (
+             <div className="text-center py-10">Loading...</div>
+          ) : savedArticles.length === 0 ? (
+            <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+              <div className="text-4xl mb-4">📂</div>
+              <p className="text-gray-500 font-medium">You don't have any saved articles yet.</p>
+              <button className="mt-4 px-6 py-2 bg-[#03d665] text-white rounded font-bold hover:bg-[#02a64e]" onClick={()=>setMode("rewrite")}>Start Rewriting</button>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {savedArticles.map((article) => (
+                <div key={article.articleId} className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 border rounded-xl hover:shadow-sm bg-[#fafbfe] transition">
+                  <div className="flex-1 pr-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${article.mode === 'rewrite' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                        {article.mode === 'rewrite' ? 'SEO Rewrite' : 'AI Bypass'}
+                      </span>
+                      <span className="text-xs text-gray-400">{new Date(article.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="text-sm font-medium text-black line-clamp-2">
+                      {article.original_text.substring(0, 150)}...
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4 md:mt-0">
+                    <button onClick={() => setViewArticle(article)} className="px-4 py-2 bg-white border rounded font-bold text-sm text-black hover:bg-gray-50">View</button>
+                    <button onClick={() => handleDeleteSavedArticle(article.articleId)} className="px-4 py-2 bg-white border border-red-100 rounded font-bold text-sm text-red-500 hover:bg-red-50">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-    );
+      );
+    }
 
     // 📚 BULK REWRITE UI
     if (mode === "bulk") return (
@@ -313,7 +410,7 @@ export default function Dashboard() {
           <div className="font-bold text-black mb-1">Click to Upload File</div>
           <div className="text-xs text-gray-400">Supports .txt and .csv (Max 50 articles per batch)</div>
         </div>
-        <button className="mt-6 w-full py-3 bg-[#03d665] text-white font-bold rounded-lg opacity-50 cursor-not-allowed">Process Batch</button>
+        <button className="mt-6 w-full py-3 bg-[#03d665] text-white font-bold rounded-lg opacity-50 cursor-not-allowed">Process Batch (Coming Soon)</button>
       </div>
     );
 
@@ -329,7 +426,6 @@ export default function Dashboard() {
             <button className="px-6 py-3 bg-black text-white rounded font-bold hover:bg-gray-800">Copy Key</button>
           </div>
         </div>
-        <button className="text-[#03d665] font-bold text-sm hover:underline">View API Documentation &rarr;</button>
       </div>
     );
 
@@ -341,10 +437,6 @@ export default function Dashboard() {
           <div>
             <label className="block text-sm font-bold text-black mb-2">Default Tone</label>
             <select className="w-full p-3 border rounded outline-none font-medium"><option>Regular</option><option>Fluent</option><option>Creative</option></select>
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-black mb-2">Auto-Save Articles</label>
-            <select className="w-full p-3 border rounded outline-none font-medium"><option>Enabled</option><option>Disabled</option></select>
           </div>
           <button className="px-8 py-3 bg-[#03d665] text-white rounded font-bold hover:bg-[#02a64e]">Save Settings</button>
         </div>
@@ -359,12 +451,10 @@ export default function Dashboard() {
           <div className="p-6 border rounded-xl bg-blue-50">
             <div className="text-sm font-bold text-blue-600 uppercase mb-2">SEO Words Remaining</div>
             <div className="text-4xl font-extrabold text-black mb-4">{seoWords}</div>
-            <div className="w-full bg-blue-200 h-2 rounded-full"><div className="bg-blue-600 h-2 rounded-full w-[70%]"></div></div>
           </div>
           <div className="p-6 border rounded-xl bg-green-50">
             <div className="text-sm font-bold text-[#03d665] uppercase mb-2">Bypass Words Remaining</div>
             <div className="text-4xl font-extrabold text-black mb-4">{bypassWords}</div>
-            <div className="w-full bg-green-200 h-2 rounded-full"><div className="bg-[#03d665] h-2 rounded-full w-[40%]"></div></div>
           </div>
         </div>
       </div>
@@ -378,11 +468,6 @@ export default function Dashboard() {
         <div className="flex gap-4 mb-8">
           <input type="text" value={`https://zerowordai.com/?ref=${user.id.slice(-6)}`} readOnly className="flex-1 p-3 border rounded outline-none bg-gray-50 font-mono text-sm" />
           <button className="px-6 py-3 bg-[#03d665] text-white rounded font-bold hover:bg-[#02a64e]">Copy Link</button>
-        </div>
-        <div className="grid grid-cols-3 gap-6">
-          <div className="p-6 border rounded-xl text-center"><div className="text-gray-500 text-sm font-bold mb-1">Total Clicks</div><div className="text-3xl font-extrabold text-black">0</div></div>
-          <div className="p-6 border rounded-xl text-center"><div className="text-gray-500 text-sm font-bold mb-1">Referrals</div><div className="text-3xl font-extrabold text-black">0</div></div>
-          <div className="p-6 border rounded-xl text-center"><div className="text-gray-500 text-sm font-bold mb-1">Earnings</div><div className="text-3xl font-extrabold text-[#03d665]">$0.00</div></div>
         </div>
       </div>
     );
@@ -418,7 +503,6 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-[#fafbfe] text-[#585858] font-sans overflow-hidden selection:bg-[#03d665] selection:text-white">
       
-      {/* 🚀 ENHANCED SIDEBAR */}
       <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
         <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
           <div className="text-[26px] font-bold tracking-tight text-[#000000] cursor-pointer" onClick={() => router.push("/")}>
@@ -428,8 +512,7 @@ export default function Dashboard() {
         <div className="py-4 flex-1 overflow-y-auto">
           {sidebarMenus.map((menu) => (
             <button 
-              key={menu.id}
-              onClick={() => setMode(menu.id)}
+              key={menu.id} onClick={() => setMode(menu.id)}
               className={`w-full flex items-center px-6 py-[12px] font-medium text-[15px] transition-colors ${mode === menu.id ? "bg-[#e1fff7] text-[#03d665] border-r-4 border-[#03d665]" : "text-[#585858] hover:text-[#03d665]"}`}
             >
               <span className="mr-3 text-lg">{menu.icon}</span> {menu.label}
@@ -450,7 +533,6 @@ export default function Dashboard() {
             <div className="hidden md:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
               {mode === "rewrite" ? (<>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>) : (<>Bypass Words: <span className="text-[#03d665] ml-1.5">{bypassWords}</span></>)}
             </div>
-
             <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold bg-[#e1fff7] text-[#03d665] px-3 py-1.5 rounded-full hover:bg-[#03d665] hover:text-white transition">🎁 Redeem Code</button>
             <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
             <UserButton afterSignOutUrl="/" />
@@ -462,7 +544,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 🎁 AppSumo Redeem Modal */}
       {showCouponModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative">
@@ -470,7 +551,7 @@ export default function Dashboard() {
             <div className="text-center mb-6">
               <div className="text-4xl mb-2">🎁</div>
               <h2 className="text-xl font-extrabold text-black">Redeem Promo Code</h2>
-              <p className="text-sm text-gray-500 mt-1">Enter your AppSumo or promotional code to unlock premium features.</p>
+              <p className="text-sm text-gray-500 mt-1">Enter your promo code to unlock premium features.</p>
             </div>
             <input 
               type="text" placeholder="e.g. SUMO-A1B2C3D4" 
