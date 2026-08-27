@@ -17,26 +17,36 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState("rewrite"); 
-  const [creditsLeft, setCreditsLeft] = useState("..."); // 🆕 পেজ লোড হলে প্রথমে ... দেখাবে
+  
+  // 🚀 নতুন লিমিট স্টেট
+  const [seoWords, setSeoWords] = useState("...");
+  const [bypassWords, setBypassWords] = useState("...");
 
-  // 🚨 ক্লায়েন্ট-সাইড সিকিউরিটি এবং রিয়েল-টাইম ক্রেডিট ফেচিং
   useEffect(() => {
     if (isLoaded && !user) {
       router.push("/sign-in");
     } else if (isLoaded && user) {
-      // 🚀 পেজ লোড হওয়ার সাথে সাথে ডাটাবেস থেকে ইউজারের আসল ক্রেডিট নিয়ে আসবে!
+      
+      // 1️⃣ ইমেইল ডেটাবেসে সিঙ্ক করা (যাতে অ্যাডমিন প্যানেলে দেখায়)
+      fetch("https://enl-rewriter-backend.onrender.com/api/sync-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.primaryEmailAddress?.emailAddress })
+      });
+
+      // 2️⃣ ইউজারের বর্তমান ওয়ার্ড লিমিট ফেচ করা
       fetch(`https://enl-rewriter-backend.onrender.com/api/user/${user.id}`)
         .then((res) => res.json())
         .then((data) => {
-          if (data.credits !== undefined) {
-            setCreditsLeft(String(data.credits));
+          if (!data.error) {
+            setSeoWords(data.seo_words !== undefined ? data.seo_words.toLocaleString() : "...");
+            setBypassWords(data.bypass_words !== undefined ? data.bypass_words.toLocaleString() : "...");
           }
         })
-        .catch((err) => console.error("Failed to fetch credits"));
+        .catch((err) => console.error("Failed to fetch limits"));
     }
   }, [isLoaded, user, router]);
 
-  // ডেটা লোড না হওয়া পর্যন্ত লোডিং দেখাবে (সাদা স্ক্রিনের বদলে)
   if (!isLoaded || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#fafbfe]">
@@ -62,7 +72,16 @@ export default function Dashboard() {
   };
 
   const handleRewrite = async () => {
-    if (!text) return;
+    if (!text.trim()) return alert("Please enter some text.");
+    
+    // 🚀 ক্লায়েন্ট সাইড লিমিট চেক
+    const requiredLimitStr = mode === "rewrite" ? seoWords : bypassWords;
+    const requiredLimit = parseInt(String(requiredLimitStr).replace(/,/g, ''));
+    
+    if (requiredLimit < wordCount) {
+      return alert(`Limit Reached! You have ${requiredLimitStr} words left for ${mode === "rewrite" ? "SEO Rewrite" : "AI Bypass"}, but your text has ${wordCount} words.`);
+    }
+
     setLoading(true);
     setResults([]);
     setCopied(false);
@@ -87,8 +106,11 @@ export default function Dashboard() {
       } else if (data.rewrites && data.rewrites.length > 0) {
         setResults(data.rewrites);
         setActiveTab(0);
-        if(data.credits_left !== undefined) {
-          setCreditsLeft(String(data.credits_left));
+        
+        // 🚀 লোকাল লিমিট আপডেট করা
+        if (data.words_left !== undefined) {
+          if (mode === "rewrite") setSeoWords(data.words_left.toLocaleString());
+          else setBypassWords(data.words_left.toLocaleString());
         }
       } else {
         setResults(["No result found."]);
@@ -128,7 +150,7 @@ export default function Dashboard() {
       {/* Sidebar */}
       <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
         <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
-          <div className="text-[26px] font-bold tracking-tight text-[#000000]">
+          <div className="text-[26px] font-bold tracking-tight text-[#000000] cursor-pointer" onClick={() => router.push("/")}>
             ZeroWord<span className="text-[#03d665]">Ai</span>
           </div>
         </div>
@@ -159,9 +181,18 @@ export default function Dashboard() {
           </div>
           
           <div className="flex items-center gap-6">
-            <div className="hidden sm:flex items-center bg-[#f1f1f1] px-4 py-1.5 rounded-full text-[13px] font-bold text-[#585858]">
-              Credits: <span className="text-[#03d665] ml-1">{creditsLeft}</span>
+            
+            {/* 🚀 Dynamic Word Limits Display */}
+            <div className="hidden sm:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
+              {mode === "rewrite" ? (
+                <>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>
+              ) : (
+                <>Bypass Words: <span className="text-[#03d665] ml-1.5">{bypassWords}</span></>
+              )}
             </div>
+
+            <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
+            
             <UserButton afterSignOutUrl="/" />
           </div>
         </header>
@@ -179,7 +210,7 @@ export default function Dashboard() {
                 <textarea
                   className="flex-1 p-6 w-full resize-none border-none outline-none bg-transparent"
                   style={{ fontSize: '14px', lineHeight: '1.8', letterSpacing: '1px' }}
-                  placeholder={mode === "rewrite" ? "Enter your text to rewrite..." : "Paste AI text here to humanize..."}
+                  placeholder={mode === "rewrite" ? "Enter your text to rewrite..." : "Paste AI text here to bypass detection..."}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                 />
