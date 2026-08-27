@@ -17,7 +17,10 @@ export default function PricingPage() {
         if (data.plans) setPlans(data.plans);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("Failed to load plans:", err);
+        setLoading(false);
+      });
   }, []);
 
   return (
@@ -42,41 +45,51 @@ export default function PricingPage() {
           <div className="flex justify-center items-center h-[200px]"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {plans.map((plan, idx) => (
-              <div key={idx} className={`bg-white p-8 rounded-2xl shadow-lg border flex flex-col justify-between transition hover:border-[#03d665] ${plan.price > 0 && plan.price < 99 ? 'border-2 border-[#03d665] relative md:-translate-y-2' : 'border-[#f1f1f1]'}`}>
-                
-                {plan.price > 0 && plan.price < 99 && <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#03d665] text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">Most Popular</span>}
-                
-                <div>
-                  <h3 className="text-2xl font-extrabold text-[#000000] mb-2">{plan.name}</h3>
-                  <p className="text-4xl font-extrabold text-[#000000] mb-6">
-                    {plan.price === 0 && plan.name.toLowerCase().includes("enterprise") ? "Custom" : `$${plan.price}`}
-                    {plan.price > 0 && <span className="text-sm font-normal text-[#585858]">/month</span>}
-                  </p>
+            {plans.map((plan, idx) => {
+              // 🛡️ Crash-Proof Logic
+              const planName = plan.name || "Unknown Plan";
+              const isEnterprise = planName.toLowerCase().includes("enterprise");
+              const seoWords = plan.seo_words || 0;
+              const bypassWords = plan.bypass_words || 0;
+              const price = plan.price || 0;
+              const features = plan.features || [];
+
+              return (
+                <div key={idx} className={`bg-white p-8 rounded-2xl shadow-lg border flex flex-col justify-between transition hover:border-[#03d665] ${price > 0 && price < 99 ? 'border-2 border-[#03d665] relative md:-translate-y-2' : 'border-[#f1f1f1]'}`}>
                   
-                  <div className="bg-[#fafbfe] p-4 rounded-xl border border-[#f1f1f1] mb-6 space-y-2">
-                    <div className="text-sm font-bold text-blue-600">
-                      {plan.price === 0 && plan.name.toLowerCase().includes("enterprise") ? "Custom Rewrite Words/Mo" : `${plan.seo_words.toLocaleString()} Rewrite Words/Mo`}
+                  {price > 0 && price < 99 && <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#03d665] text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">Most Popular</span>}
+                  
+                  <div>
+                    <h3 className="text-2xl font-extrabold text-[#000000] mb-2">{planName}</h3>
+                    <p className="text-4xl font-extrabold text-[#000000] mb-6">
+                      {price === 0 && isEnterprise ? "Custom" : `$${price}`}
+                      {price > 0 && <span className="text-sm font-normal text-[#585858]">/month</span>}
+                    </p>
+                    
+                    <div className="bg-[#fafbfe] p-4 rounded-xl border border-[#f1f1f1] mb-6 space-y-2">
+                      <div className="text-sm font-bold text-blue-600">
+                        {price === 0 && isEnterprise ? "Custom Rewrite Words/Mo" : `${seoWords.toLocaleString()} Rewrite Words/Mo`}
+                      </div>
+                      <div className="text-sm font-bold text-[#03d665]">
+                        {price === 0 && isEnterprise ? "Custom Pass AI Detection Words/Mo" : `${bypassWords.toLocaleString()} Pass AI Detection Words/Mo`}
+                      </div>
                     </div>
-                    <div className="text-sm font-bold text-[#03d665]">
-                      {plan.price === 0 && plan.name.toLowerCase().includes("enterprise") ? "Custom Pass AI Detection Words/Mo" : `${plan.bypass_words.toLocaleString()} Pass AI Detection Words/Mo`}
-                    </div>
+                    
+                    <ul className="text-left text-[#585858] space-y-3 mb-8 text-sm">
+                      {features.map((feature, fIdx) => (
+                        <li key={fIdx} className="flex items-start gap-2">
+                          <span className="text-[#03d665] mt-0.5">✓</span> <span className="text-[#000000] font-medium leading-snug">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   
-                  <ul className="text-left text-[#585858] space-y-3 mb-8 text-sm">
-                    {(plan.features || []).map((feature, fIdx) => (
-                      <li key={fIdx} className="flex items-start gap-2">
-                        <span className="text-[#03d665] mt-0.5">✓</span> <span className="text-[#000000] font-medium leading-snug">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <button className={`w-full py-3 font-bold rounded-xl transition ${price > 0 && price < 99 ? 'bg-[#03d665] text-white hover:bg-[#02a64e] shadow-md' : 'bg-black text-white hover:bg-gray-800'}`}>
+                    {isEnterprise ? "Contact Us" : "Get Started"}
+                  </button>
                 </div>
-                
-                <button className={`w-full py-3 font-bold rounded-xl transition ${plan.price > 0 && plan.price < 99 ? 'bg-[#03d665] text-white hover:bg-[#02a64e] shadow-md' : 'bg-black text-white hover:bg-gray-800'}`}>
-                  {plan.name.toLowerCase().includes("enterprise") ? "Contact Us" : "Get Started"}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
