@@ -5,7 +5,7 @@ import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 // 🚨 আপনার ইমেইল বসান
-const ADMIN_EMAIL = "your-email@gmail.com"; 
+const ADMIN_EMAIL = "seotoolshero@gmail.com"; 
 
 export default function AdminDashboard() {
   const { isLoaded, user } = useUser();
