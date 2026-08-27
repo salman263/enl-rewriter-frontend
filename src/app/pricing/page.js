@@ -46,41 +46,71 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-[#fafbfe] text-[#585858] font-sans flex flex-col">
+      
+      {/* 🚀 Professional Header (যেটা ফিরে এলো) */}
       <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-8 z-10 shadow-sm">
         <div className="flex items-center cursor-pointer" onClick={() => router.push("/dashboard")}>
-          <div className="text-[24px] font-extrabold text-[#000000]">ZeroWord<span className="text-[#03d665]">Ai</span></div>
+          <div className="text-[24px] font-extrabold text-[#000000]">
+            ZeroWord<span className="text-[#03d665]">Ai</span>
+          </div>
         </div>
         <div className="flex items-center gap-6">
-          <button onClick={() => router.push("/dashboard")} className="text-sm font-medium hover:text-[#03d665] transition">Dashboard</button>
-          {user ? <UserButton afterSignOutUrl="/" /> : <button onClick={() => router.push("/sign-in")} className="px-4 py-2 bg-[#03d665] text-white text-sm font-medium rounded-lg hover:bg-[#02a64e] transition">Sign In</button>}
+          <button 
+            onClick={() => router.push("/dashboard")}
+            className="text-sm font-medium hover:text-[#03d665] transition"
+          >
+            Dashboard
+          </button>
+          {user ? (
+            <UserButton afterSignOutUrl="/" />
+          ) : (
+            <button 
+              onClick={() => router.push("/sign-in")}
+              className="px-4 py-2 bg-[#03d665] text-white text-sm font-medium rounded-lg hover:bg-[#02a64e] transition"
+            >
+              Sign In
+            </button>
+          )}
         </div>
       </header>
 
+      {/* Pricing Content */}
       <div className="flex-1 py-16 px-6 max-w-6xl mx-auto w-full">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h1 className="text-4xl font-extrabold text-[#000000] mb-4 tracking-tight">Simple, transparent pricing</h1>
-          <p className="text-[#585858] text-base">Choose the ideal plan to scale your content writing.</p>
+          <h1 className="text-4xl font-extrabold text-[#000000] mb-4 tracking-tight">
+            Simple, transparent pricing for <span className="text-[#03d665]">everyone</span>
+          </h1>
+          <p className="text-[#585858] text-base">
+            Choose the ideal plan to scale your content writing and completely bypass AI detectors effortlessly.
+          </p>
         </div>
 
         {loading ? (
-          <div className="flex justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div></div>
+          <div className="flex justify-center items-center h-[200px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {plans.map((plan, idx) => (
-              <div key={idx} className={`bg-white p-8 rounded-2xl shadow-sm border ${plan.price > 0 ? 'border-2 border-[#03d665] relative md:-translate-y-2 shadow-[0_10px_30px_0_rgba(3,214,101,0.1)]' : 'border-[#f1f1f1] hover:border-[#e1e1e1]'} flex flex-col justify-between transition`}>
-                {plan.price > 0 && <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#03d665] text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">Premium</span>}
+              <div key={idx} className={`bg-white p-8 rounded-2xl shadow-[0_4px_20px_0_rgba(0,0,0,0.03)] border flex flex-col justify-between transition hover:border-[#e1e1e1] ${plan.price > 0 ? 'border-2 border-[#03d665] relative md:-translate-y-2 shadow-[0_10px_30px_0_rgba(3,214,101,0.1)]' : 'border-[#f1f1f1]'}`}>
+                
+                {/* Premium Badge */}
+                {plan.price > 0 && <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#03d665] text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-sm">Premium</span>}
+                
                 <div>
                   <div className="text-sm font-bold uppercase tracking-wider text-[#585858] mb-2">{plan.name}</div>
                   <p className="text-4xl font-extrabold text-[#000000] mb-6 mt-4">${plan.price} <span className="text-sm font-normal text-[#585858]">{plan.price > 0 ? '/month' : '/forever'}</span></p>
+                  
                   <ul className="text-left text-[#585858] space-y-4 mb-8 text-sm border-t border-[#f1f1f1] pt-6">
                     {plan.features.map((feature, fIdx) => (
                       <li key={fIdx} className="flex items-center gap-2">✅ <span className="text-[#000000] font-medium">{feature}</span></li>
                     ))}
                   </ul>
                 </div>
+                
                 <button 
                   onClick={() => plan.price === 0 ? router.push("/dashboard") : handleUpgrade(plan.name, plan.credits)}
-                  className={`w-full py-3 font-bold rounded-xl transition ${plan.price > 0 ? 'bg-[#03d665] text-white hover:bg-[#02a64e]' : 'bg-[#fafbfe] border border-[#e1e1e1] text-[#000000] hover:bg-[#f1f1f1]'}`}
+                  className={`w-full py-3 font-bold rounded-xl transition ${plan.price > 0 ? 'bg-[#03d665] text-white hover:bg-[#02a64e] shadow-md shadow-[#03d665]/20' : 'bg-[#fafbfe] border border-[#e1e1e1] text-[#000000] hover:bg-[#f1f1f1]'}`}
                 >
                   {plan.price === 0 ? "Get Started" : `Upgrade to ${plan.name}`}
                 </button>
@@ -89,6 +119,11 @@ export default function PricingPage() {
           </div>
         )}
       </div>
+
+      {/* 🚀 Footer (যেটাও মিস হয়ে গেছিল!) */}
+      <footer className="py-6 border-t border-[#f1f1f1] text-center text-xs text-[#585858]">
+        © 2026 ZeroWordAi. All rights reserved.
+      </footer>
     </div>
   );
 }
