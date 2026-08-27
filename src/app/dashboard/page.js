@@ -18,23 +18,17 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState("rewrite"); 
   
-  // 🚀 নতুন লিমিট স্টেট
+  // 🚀 সঠিক লিমিট স্টেট (creditsLeft বাদ দিয়ে আলাদা করা হয়েছে)
   const [seoWords, setSeoWords] = useState("...");
   const [bypassWords, setBypassWords] = useState("...");
 
-  useEffect(() => {
-    if (isLoaded && !user) {
-      router.push("/sign-in");
-    } else if (isLoaded && user) {
-      
-      // 1️⃣ ইমেইল ডেটাবেসে সিঙ্ক করা (যাতে অ্যাডমিন প্যানেলে দেখায়)
-      fetch("https://enl-rewriter-backend.onrender.com/api/sync-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, email: user.primaryEmailAddress?.emailAddress })
-      });
+  // 🎁 AppSumo Coupon States
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [redeemLoading, setRedeemLoading] = useState(false);
 
-      // 2️⃣ ইউজারের বর্তমান ওয়ার্ড লিমিট ফেচ করা
+  const fetchUserLimits = () => {
+    if (user) {
       fetch(`https://enl-rewriter-backend.onrender.com/api/user/${user.id}`)
         .then((res) => res.json())
         .then((data) => {
@@ -44,6 +38,21 @@ export default function Dashboard() {
           }
         })
         .catch((err) => console.error("Failed to fetch limits"));
+    }
+  };
+
+  useEffect(() => {
+    if (isLoaded && !user) {
+      router.push("/sign-in");
+    } else if (isLoaded && user) {
+      // ইমেইল সিঙ্ক
+      fetch("https://enl-rewriter-backend.onrender.com/api/sync-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.primaryEmailAddress?.emailAddress })
+      });
+      // লিমিট ফেচ
+      fetchUserLimits();
     }
   }, [isLoaded, user, router]);
 
@@ -74,12 +83,12 @@ export default function Dashboard() {
   const handleRewrite = async () => {
     if (!text.trim()) return alert("Please enter some text.");
     
-    // 🚀 ক্লায়েন্ট সাইড লিমিট চেক
+    // লিমিট চেক
     const requiredLimitStr = mode === "rewrite" ? seoWords : bypassWords;
     const requiredLimit = parseInt(String(requiredLimitStr).replace(/,/g, ''));
     
     if (requiredLimit < wordCount) {
-      return alert(`Limit Reached! You have ${requiredLimitStr} words left for ${mode === "rewrite" ? "SEO Rewrite" : "AI Bypass"}, but your text has ${wordCount} words.`);
+      return alert(`Limit Reached! You have ${requiredLimitStr} words left for ${mode === "rewrite" ? "SEO Rewrite" : "AI Bypass"}.`);
     }
 
     setLoading(true);
@@ -107,7 +116,7 @@ export default function Dashboard() {
         setResults(data.rewrites);
         setActiveTab(0);
         
-        // 🚀 লোকাল লিমিট আপডেট করা
+        // ব্যালেন্স আপডেট
         if (data.words_left !== undefined) {
           if (mode === "rewrite") setSeoWords(data.words_left.toLocaleString());
           else setBypassWords(data.words_left.toLocaleString());
@@ -127,6 +136,30 @@ export default function Dashboard() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  // 🎁 Redeem Coupon Function
+  const handleRedeem = async () => {
+    if (!couponCode.trim()) return alert("Please enter a valid code");
+    setRedeemLoading(true);
+    try {
+      const res = await fetch("https://enl-rewriter-backend.onrender.com/api/redeem-coupon", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, code: couponCode.trim().toUpperCase() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("🎉 Coupon Redeemed Successfully! Your plan has been upgraded.");
+        setShowCouponModal(false);
+        setCouponCode("");
+        fetchUserLimits(); // নতুন লিমিট লোড করবে
+      } else {
+        alert(data.error || "Invalid or used coupon code.");
+      }
+    } catch (err) {
+      alert("Failed to redeem coupon.");
+    }
+    setRedeemLoading(false);
   };
 
   const renderHighlightedText = (originalText, newText) => {
@@ -180,10 +213,10 @@ export default function Dashboard() {
             {mode === "rewrite" ? "Semantic SEO Rewriter" : "AI Detection Humanizer"}
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             
             {/* 🚀 Dynamic Word Limits Display */}
-            <div className="hidden sm:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
+            <div className="hidden md:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
               {mode === "rewrite" ? (
                 <>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>
               ) : (
@@ -191,8 +224,12 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* 🎁 Redeem AppSumo Code Button */}
+            <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold bg-[#e1fff7] text-[#03d665] px-3 py-1.5 rounded-full hover:bg-[#03d665] hover:text-white transition">
+              🎁 Redeem Code
+            </button>
+
             <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
-            
             <UserButton afterSignOutUrl="/" />
           </div>
         </header>
@@ -285,13 +322,13 @@ export default function Dashboard() {
                    </div>
                    <div className="flex justify-between text-[11px] text-[#585858] mb-2 font-medium">
                       <span className={sliderValue == 1 ? "text-[#03d665]" : ""}>
-                        {mode === "rewrite" ? "More Conservative" : "Basic Bypass"}
+                        {mode === "rewrite" ? "Conservative" : "Basic Bypass"}
                       </span>
                       <span className={sliderValue == 2 ? "text-[#03d665]" : ""}>
                         {mode === "rewrite" ? "Regular" : "Advanced"}
                       </span>
                       <span className={sliderValue == 3 ? "text-[#03d665]" : ""}>
-                        {mode === "rewrite" ? "More Adventurous" : "Max Human"}
+                        {mode === "rewrite" ? "Adventurous" : "Max Human"}
                       </span>
                    </div>
                    <input 
@@ -324,6 +361,34 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* 🎁 AppSumo Redeem Modal */}
+      {showCouponModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative">
+            <button onClick={() => setShowCouponModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">&times;</button>
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-2">🎁</div>
+              <h2 className="text-xl font-extrabold text-black">Redeem Promo Code</h2>
+              <p className="text-sm text-gray-500 mt-1">Enter your AppSumo or promotional code to unlock premium features.</p>
+            </div>
+            <input 
+              type="text" 
+              placeholder="e.g. SUMO-A1B2C3D4" 
+              className="w-full border-2 border-gray-200 focus:border-[#03d665] p-3 rounded-xl outline-none font-mono font-bold text-center text-lg text-black mb-4 uppercase"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+            />
+            <button 
+              onClick={handleRedeem}
+              disabled={redeemLoading || !couponCode}
+              className="w-full py-3 bg-[#03d665] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#02a64e] disabled:opacity-50 transition"
+            >
+              {redeemLoading ? "Verifying..." : "Redeem Now"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
