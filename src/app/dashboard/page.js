@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import "react-quill/dist/quill.snow.css";
+
+// 🚀 WordAi-এর মত Premium Toolbar লোড করা হচ্ছে
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
 export default function Dashboard() {
   const { isLoaded, user } = useUser(); 
   const router = useRouter(); 
 
-  // Core Rewrite States
   const [text, setText] = useState("");
   const [sliderValue, setSliderValue] = useState(2); 
   const [numRewrites, setNumRewrites] = useState(1); 
@@ -18,21 +22,38 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  // Navigation & Limits State
   const [mode, setMode] = useState("rewrite"); 
   const [seoWords, setSeoWords] = useState("...");
   const [bypassWords, setBypassWords] = useState("...");
   const [planName, setPlanName] = useState("...");
   
-  // AppSumo Coupon States
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
 
-  // 🚀 Saved Articles States
   const [savedArticles, setSavedArticles] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
-  const [viewArticle, setViewArticle] = useState(null); // For viewing full saved article
+  const [viewArticle, setViewArticle] = useState(null); 
+
+  // 🚀 ടoolbar Options (Like Screenshot)
+  const quillModules = {
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      [{ 'list': 'bullet' }, { 'list': 'ordered' }],
+      ['code-block']
+    ]
+  };
+
+  // 🚀 HTML Stripper (To calculate real words & send plain text to AI)
+  const stripHtml = (html) => {
+    if (typeof window === "undefined") return "";
+    const tmp = document.createElement("DIV");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  };
+
+  const plainText = stripHtml(text);
+  const wordCount = plainText.trim() ? plainText.trim().split(/\s+/).length : 0;
 
   const fetchUserLimits = () => {
     if (user) {
@@ -72,10 +93,21 @@ export default function Dashboard() {
     }
   }, [isLoaded, user, router]);
 
-  // Fetch saved articles when mode changes to 'saved'
   useEffect(() => {
     if (mode === "saved") fetchSavedArticles();
   }, [mode]);
+
+  // 🚀 FIX: Clear text when switching modes
+  const handleModeChange = (newMode) => {
+    if (newMode !== mode) {
+      setText("");
+      setResults([]);
+      setActiveTab(0);
+      setCopied(false);
+      setViewArticle(null);
+    }
+    setMode(newMode);
+  };
 
   if (!isLoaded || !user) {
     return (
@@ -84,9 +116,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const userId = user.id;
-  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
   const getTone = (value) => {
     if (mode === "rewrite") {
@@ -102,7 +131,7 @@ export default function Dashboard() {
   };
 
   const handleRewrite = async () => {
-    if (!text.trim()) return alert("Please enter some text.");
+    if (!plainText.trim()) return alert("Please enter some text.");
     
     const requiredLimitStr = mode === "rewrite" ? seoWords : bypassWords;
     const requiredLimit = parseInt(String(requiredLimitStr).replace(/,/g, ''));
@@ -118,7 +147,7 @@ export default function Dashboard() {
     try {
       const res = await fetch("https://enl-rewriter-backend.onrender.com/api/rewrite", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text, tone: getTone(sliderValue), num_rewrites: numRewrites, mode: mode, userId: userId }),
+        body: JSON.stringify({ text: plainText, tone: getTone(sliderValue), num_rewrites: numRewrites, mode: mode, userId: user.id }),
       });
 
       const data = await res.json();
@@ -149,13 +178,12 @@ export default function Dashboard() {
     }
   };
 
-  // 🚀 Save Generated Article
   const handleSaveCurrentArticle = async () => {
     if (!results[activeTab]) return;
     try {
       const res = await fetch("https://enl-rewriter-backend.onrender.com/api/saved-articles", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, original_text: text, rewritten_text: results[activeTab], mode: mode })
+        body: JSON.stringify({ userId: user.id, original_text: plainText, rewritten_text: results[activeTab], mode: mode })
       });
       const data = await res.json();
       if(data.success) alert("Article saved to your dashboard!");
@@ -163,7 +191,6 @@ export default function Dashboard() {
     } catch(err) { alert("Network error."); }
   };
 
-  // 🚀 Delete Saved Article
   const handleDeleteSavedArticle = async (articleId) => {
     if(!window.confirm("Delete this saved article?")) return;
     try {
@@ -194,19 +221,22 @@ export default function Dashboard() {
     setRedeemLoading(false);
   };
 
-  const renderHighlightedText = (originalText, newText) => {
-    if (!highlight || !originalText) return newText;
+  // 🚀 Output Highlighter for Quill
+  const getHighlightedHtml = (originalHtml, newText) => {
+    if (!highlight || !originalHtml) return newText;
+    const originalText = stripHtml(originalHtml);
     const origWords = originalText.toLowerCase().match(/\b(\w+)\b/g) || [];
     const newWordsArray = newText.split(/(\s+)/); 
 
-    return newWordsArray.map((word, i) => {
-      if (word.trim() === "") return <span key={i}>{word}</span>;
+    const htmlArray = newWordsArray.map((word) => {
+      if (word.trim() === "") return word;
       const cleanWord = word.toLowerCase().replace(/[^\w]/g, "");
       if (cleanWord && !origWords.includes(cleanWord)) {
-        return <span key={i} className="text-[#03d665] bg-[#e1fff7] font-medium px-[2px] rounded">{word}</span>;
+        return `<span style="background-color: #e1fff7; color: #03d665; font-weight: 500; padding: 0 3px; border-radius: 4px;">${word}</span>`;
       }
-      return <span key={i}>{word}</span>;
+      return word;
     });
+    return htmlArray.join('');
   };
 
   const sidebarMenus = [
@@ -227,22 +257,26 @@ export default function Dashboard() {
       return (
         <div className="max-w-[1400px] mx-auto bg-white rounded-[10px] shadow-[0_0_20px_0_rgba(0,0,0,0.05)] border border-[#f1f1f1] overflow-hidden">
           <div className="flex flex-col lg:flex-row min-h-[500px]">
-            <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[#f1f1f1] relative">
+            
+            {/* Input Area (With Quill) */}
+            <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[#f1f1f1] relative quill-wrapper">
               <div className="px-6 py-3 flex justify-between bg-[#fafbfe] border-b border-[#f1f1f1]">
                 <span className="text-[13px] font-bold text-[#000000] uppercase">Original Content</span>
                 <button onClick={() => setText("")} className="text-[13px] font-medium hover:text-red-500">Clear</button>
               </div>
-              <textarea
-                className="flex-1 p-6 w-full resize-none border-none outline-none bg-transparent"
-                style={{ fontSize: '14px', lineHeight: '1.8', letterSpacing: '1px' }}
-                placeholder={mode === "rewrite" ? "Enter your text to rewrite..." : "Paste AI text here to bypass detection..."}
+              <ReactQuill
+                theme="snow"
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={setText}
+                modules={quillModules}
+                placeholder={mode === "rewrite" ? "Enter your text to rewrite..." : "Paste AI text here to bypass detection..."}
+                className="flex-1 w-full bg-white"
               />
-              <div className="px-6 py-2 text-[12px] text-[#c2c2c2] font-medium border-t border-[#f1f1f1]">Words: {wordCount}</div>
+              <div className="px-6 py-2 text-[12px] text-[#c2c2c2] font-medium border-t border-[#f1f1f1] bg-white">Words: {wordCount}</div>
             </div>
 
-            <div className="flex-1 flex flex-col relative bg-[#fafbfe]">
+            {/* Output Area (With Quill) */}
+            <div className="flex-1 flex flex-col relative bg-[#fafbfe] quill-wrapper">
               <div className="px-6 py-3 flex items-center justify-between border-b border-[#f1f1f1] bg-[#fafbfe]">
                 <div className="flex gap-4">
                   {results.length > 0 ? results.map((_, idx) => (
@@ -261,35 +295,25 @@ export default function Dashboard() {
                 
                 {results.length > 0 && (
                   <div className="flex gap-2">
-                    <button 
-                      onClick={() => setHighlight(!highlight)}
-                      className={`text-[12px] font-medium px-2 py-1 rounded border transition-all ${highlight ? 'bg-[#e1fff7] text-[#03d665] border-[#03d665]' : 'bg-white text-[#585858] border-[#f1f1f1]'}`}
-                    >✨ Highlights</button>
-                    {/* 🚀 SAVE BUTTON ADDED */}
-                    <button onClick={handleSaveCurrentArticle} className="text-[12px] font-medium px-2 py-1 bg-white border border-[#f1f1f1] rounded hover:text-blue-500">
-                      💾 Save
-                    </button>
-                    <button onClick={handleCopy} className="text-[12px] font-medium px-2 py-1 bg-white border border-[#f1f1f1] rounded hover:text-[#03d665]">
-                      {copied ? "Copied!" : "Copy"}
-                    </button>
+                    <button onClick={() => setHighlight(!highlight)} className={`text-[12px] font-medium px-2 py-1 rounded border transition-all ${highlight ? 'bg-[#e1fff7] text-[#03d665] border-[#03d665]' : 'bg-white text-[#585858] border-[#f1f1f1]'}`}>✨ Highlights</button>
+                    <button onClick={handleSaveCurrentArticle} className="text-[12px] font-medium px-2 py-1 bg-white border border-[#f1f1f1] rounded hover:text-blue-500">💾 Save</button>
+                    <button onClick={handleCopy} className="text-[12px] font-medium px-2 py-1 bg-white border border-[#f1f1f1] rounded hover:text-[#03d665]">{copied ? "Copied!" : "Copy"}</button>
                   </div>
                 )}
               </div>
 
-              <div className="flex-1 p-6 overflow-y-auto">
-                {results.length > 0 ? (
-                  <div className="whitespace-pre-wrap outline-none text-[#585858]" style={{ fontSize: '14px', lineHeight: '1.8' }}>
-                    {renderHighlightedText(text, results[activeTab])}
-                  </div>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-[#c2c2c2] text-[14px]">
-                    Your {mode === "rewrite" ? "rewritten" : "humanized"} text will appear here.
-                  </div>
-                )}
-              </div>
+              <ReactQuill
+                theme="snow"
+                value={results.length > 0 ? getHighlightedHtml(text, results[activeTab]) : ""}
+                readOnly={true}
+                modules={quillModules}
+                placeholder={mode === "rewrite" ? "Your rewritten text will appear here." : "Your humanized text will appear here."}
+                className="flex-1 w-full bg-white output-quill"
+              />
             </div>
           </div>
 
+          {/* Dynamic Bottom Settings */}
           <div className="bg-white border-t border-[#f1f1f1] p-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="w-full md:w-[150px]">
@@ -320,8 +344,8 @@ export default function Dashboard() {
 
               <div className="w-full md:w-auto text-right">
                 <button
-                  onClick={handleRewrite} disabled={loading || !text}
-                  className={`w-full md:w-[160px] h-[50px] rounded-[7px] text-[16px] font-medium text-white transition-colors flex items-center justify-center gap-2 ${loading || !text ? "opacity-50 cursor-not-allowed" : "hover:bg-[#02a64e]"}`}
+                  onClick={handleRewrite} disabled={loading || !plainText}
+                  className={`w-full md:w-[160px] h-[50px] rounded-[7px] text-[16px] font-medium text-white transition-colors flex items-center justify-center gap-2 ${loading || !plainText ? "opacity-50 cursor-not-allowed" : "hover:bg-[#02a64e]"}`}
                   style={{ backgroundColor: '#03d665' }}
                 >
                   {loading ? (
@@ -335,7 +359,7 @@ export default function Dashboard() {
       );
     }
     
-    // 💾 REAL SAVED ARTICLES UI
+    // 💾 SAVED ARTICLES UI
     if (mode === "saved") {
       if(viewArticle) {
         return (
@@ -371,7 +395,7 @@ export default function Dashboard() {
             <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
               <div className="text-4xl mb-4">📂</div>
               <p className="text-gray-500 font-medium">You don't have any saved articles yet.</p>
-              <button className="mt-4 px-6 py-2 bg-[#03d665] text-white rounded font-bold hover:bg-[#02a64e]" onClick={()=>setMode("rewrite")}>Start Rewriting</button>
+              <button className="mt-4 px-6 py-2 bg-[#03d665] text-white rounded font-bold hover:bg-[#02a64e]" onClick={()=>handleModeChange("rewrite")}>Start Rewriting</button>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -501,72 +525,85 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen bg-[#fafbfe] text-[#585858] font-sans overflow-hidden selection:bg-[#03d665] selection:text-white">
-      
-      <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
-        <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
-          <div className="text-[26px] font-bold tracking-tight text-[#000000] cursor-pointer" onClick={() => router.push("/")}>
-            ZeroWord<span className="text-[#03d665]">Ai</span>
-          </div>
-        </div>
-        <div className="py-4 flex-1 overflow-y-auto">
-          {sidebarMenus.map((menu) => (
-            <button 
-              key={menu.id} onClick={() => setMode(menu.id)}
-              className={`w-full flex items-center px-6 py-[12px] font-medium text-[15px] transition-colors ${mode === menu.id ? "bg-[#e1fff7] text-[#03d665] border-r-4 border-[#03d665]" : "text-[#585858] hover:text-[#03d665]"}`}
-            >
-              <span className="mr-3 text-lg">{menu.icon}</span> {menu.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <>
+      {/* 🚀 Global Custom CSS For Quill Editor to Match UI */}
+      <style jsx global>{`
+        .quill-wrapper { display: flex; flex-direction: column; height: 100%; }
+        .quill-wrapper .quill { display: flex; flex-direction: column; flex: 1; }
+        .quill-wrapper .ql-toolbar { border: none !important; border-bottom: 1px solid #f1f1f1 !important; background: #ffffff; padding: 12px 20px !important; }
+        .quill-wrapper .ql-container { flex: 1; border: none !important; font-size: 14px !important; font-family: inherit !important; color: #585858 !important; overflow-y: auto; }
+        .quill-wrapper .ql-editor { min-height: 250px; padding: 24px !important; line-height: 1.8; }
+        .quill-wrapper .ql-editor:focus { outline: none; }
+        .output-quill .ql-toolbar { background: #fafbfe !important; }
+      `}</style>
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-6 z-10 shadow-sm">
-          <div className="flex items-center lg:hidden"><div className="text-[22px] font-bold text-[#000000]">ZeroWord<span className="text-[#03d665]">Ai</span></div></div>
-          
-          <div className="hidden lg:block text-[#000000] font-bold text-lg">
-            {sidebarMenus.find(m => m.id === mode)?.label || "Dashboard"}
-          </div>
-          
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="hidden md:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
-              {mode === "rewrite" ? (<>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>) : (<>Bypass Words: <span className="text-[#03d665] ml-1.5">{bypassWords}</span></>)}
+      <div className="flex h-screen bg-[#fafbfe] text-[#585858] font-sans overflow-hidden selection:bg-[#03d665] selection:text-white">
+        
+        <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
+          <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
+            <div className="text-[26px] font-bold tracking-tight text-[#000000] cursor-pointer" onClick={() => router.push("/")}>
+              ZeroWord<span className="text-[#03d665]">Ai</span>
             </div>
-            <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold bg-[#e1fff7] text-[#03d665] px-3 py-1.5 rounded-full hover:bg-[#03d665] hover:text-white transition">🎁 Redeem Code</button>
-            <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
-            <UserButton afterSignOutUrl="/" />
           </div>
-        </header>
-
-        <div className="flex-1 overflow-auto p-4 md:p-8 bg-[#fafbfe]">
-          {renderContent()}
+          <div className="py-4 flex-1 overflow-y-auto">
+            {sidebarMenus.map((menu) => (
+              <button 
+                key={menu.id} onClick={() => handleModeChange(menu.id)}
+                className={`w-full flex items-center px-6 py-[12px] font-medium text-[15px] transition-colors ${mode === menu.id ? "bg-[#e1fff7] text-[#03d665] border-r-4 border-[#03d665]" : "text-[#585858] hover:text-[#03d665]"}`}
+              >
+                <span className="mr-3 text-lg">{menu.icon}</span> {menu.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {showCouponModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative">
-            <button onClick={() => setShowCouponModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">&times;</button>
-            <div className="text-center mb-6">
-              <div className="text-4xl mb-2">🎁</div>
-              <h2 className="text-xl font-extrabold text-black">Redeem Promo Code</h2>
-              <p className="text-sm text-gray-500 mt-1">Enter your promo code to unlock premium features.</p>
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+          <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-6 z-10 shadow-sm">
+            <div className="flex items-center lg:hidden"><div className="text-[22px] font-bold text-[#000000]">ZeroWord<span className="text-[#03d665]">Ai</span></div></div>
+            
+            <div className="hidden lg:block text-[#000000] font-bold text-lg">
+              {sidebarMenus.find(m => m.id === mode)?.label || "Dashboard"}
             </div>
-            <input 
-              type="text" placeholder="e.g. SUMO-A1B2C3D4" 
-              className="w-full border-2 border-gray-200 focus:border-[#03d665] p-3 rounded-xl outline-none font-mono font-bold text-center text-lg text-black mb-4 uppercase"
-              value={couponCode} onChange={(e) => setCouponCode(e.target.value)}
-            />
-            <button 
-              onClick={handleRedeem} disabled={redeemLoading || !couponCode}
-              className="w-full py-3 bg-[#03d665] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#02a64e] disabled:opacity-50 transition"
-            >
-              {redeemLoading ? "Verifying..." : "Redeem Now"}
-            </button>
+            
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="hidden md:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
+                {mode === "rewrite" ? (<>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>) : (<>Bypass Words: <span className="text-[#03d665] ml-1.5">{bypassWords}</span></>)}
+              </div>
+              <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold bg-[#e1fff7] text-[#03d665] px-3 py-1.5 rounded-full hover:bg-[#03d665] hover:text-white transition">🎁 Redeem Code</button>
+              <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
+              <UserButton afterSignOutUrl="/" />
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-auto p-4 md:p-8 bg-[#fafbfe]">
+            {renderContent()}
           </div>
         </div>
-      )}
-    </div>
+
+        {showCouponModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative">
+              <button onClick={() => setShowCouponModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">&times;</button>
+              <div className="text-center mb-6">
+                <div className="text-4xl mb-2">🎁</div>
+                <h2 className="text-xl font-extrabold text-black">Redeem Promo Code</h2>
+                <p className="text-sm text-gray-500 mt-1">Enter your promo code to unlock premium features.</p>
+              </div>
+              <input 
+                type="text" placeholder="e.g. SUMO-A1B2C3D4" 
+                className="w-full border-2 border-gray-200 focus:border-[#03d665] p-3 rounded-xl outline-none font-mono font-bold text-center text-lg text-black mb-4 uppercase"
+                value={couponCode} onChange={(e) => setCouponCode(e.target.value)}
+              />
+              <button 
+                onClick={handleRedeem} disabled={redeemLoading || !couponCode}
+                className="w-full py-3 bg-[#03d665] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#02a64e] disabled:opacity-50 transition"
+              >
+                {redeemLoading ? "Verifying..." : "Redeem Now"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
