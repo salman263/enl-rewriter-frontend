@@ -5,7 +5,7 @@ import { useUser, UserButton } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
 // 🚨 এখানে আপনার ইমেইল দিন
-const ADMIN_EMAIL = "seotoolshero@gmail.com"; 
+const ADMIN_EMAIL = "your-email@gmail.com"; 
 
 export default function AdminDashboard() {
   const { isLoaded, user } = useUser();
@@ -45,6 +45,19 @@ export default function AdminDashboard() {
     }
   }, [isLoaded, user, router]);
 
+  // 🚀 QUICK BAN LOGIC
+  const handleQuickBan = async (u) => {
+    const action = u.banned ? "UNBAN" : "BAN";
+    if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
+    try {
+      await fetch("https://enl-rewriter-backend.onrender.com/api/admin/super-update", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: u.userId, plan: u.plan, seo_words: u.seo_words, bypass_words: u.bypass_words, banned: !u.banned }),
+      });
+      fetchData();
+    } catch (err) { alert("Failed to update status"); }
+  };
+
   const handleSaveUser = async () => {
     try {
       await fetch("https://enl-rewriter-backend.onrender.com/api/admin/super-update", {
@@ -64,24 +77,12 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  // 🚀 SMART PLAN SELECTION LOGIC
-  const handlePlanChange = (e) => {
-    const selectedPlanName = e.target.value;
-    setEditPlan(selectedPlanName);
-    
-    // যে প্ল্যান সিলেক্ট করা হয়েছে তার লিমিট ডেটাবেস থেকে খুঁজে বের করা
-    const matchedPlan = plansList.find(p => p.name === selectedPlanName);
-    if (matchedPlan) {
-      setEditSeoWords(matchedPlan.seo_words);
-      setEditBypassWords(matchedPlan.bypass_words);
-    }
-  };
-
   const handleSavePlan = async () => {
     try {
       const generatedPlanId = planForm.planId || planForm.name.toLowerCase().replace(/\s+/g, '-') + '-' + Math.floor(Math.random() * 1000);
       const featureArray = planForm.features.split(",").map(f => f.trim()).filter(f => f);
       const payload = { ...planForm, planId: generatedPlanId, features: featureArray };
+      
       await fetch("https://enl-rewriter-backend.onrender.com/api/admin/plans", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -107,6 +108,15 @@ export default function AdminDashboard() {
     const featureString = p.features ? p.features.join(", ") : "";
     setPlanForm({ planId: p.planId, name: p.name, price: p.price, seo_words: p.seo_words, bypass_words: p.bypass_words, features: featureString, sort_order: p.sort_order || 99 });
     setShowPlanModal(true);
+  };
+
+  const handlePlanChange = (e) => {
+    setEditPlan(e.target.value);
+    const matchedPlan = plansList.find(p => p.name === e.target.value);
+    if (matchedPlan) {
+      setEditSeoWords(matchedPlan.seo_words);
+      setEditBypassWords(matchedPlan.bypass_words);
+    }
   };
 
   if (!isLoaded || loading) return <div className="flex h-screen justify-center items-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div></div>;
@@ -138,18 +148,39 @@ export default function AdminDashboard() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#fafbfe] text-xs uppercase tracking-wider border-b border-[#f1f1f1]">
-                      <th className="p-4 pl-6">User ID</th><th className="p-4">Plan</th><th className="p-4">SEO Words</th><th className="p-4">Bypass Words</th><th className="p-4 pr-6 text-right">Action</th>
+                      <th className="p-4 pl-6">User Info</th>
+                      <th className="p-4">Plan</th>
+                      <th className="p-4">Limits</th>
+                      <th className="p-4 pr-6 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm divide-y divide-[#f1f1f1]">
                     {usersList.map((u, i) => (
-                      <tr key={i} className="hover:bg-[#fafbfe]">
-                        <td className="p-4 pl-6 font-mono text-xs">{u.userId}</td>
+                      <tr key={i} className={`hover:bg-[#fafbfe] ${u.banned ? 'bg-red-50' : ''}`}>
+                        
+                        {/* 📧 Email Display */}
+                        <td className="p-4 pl-6">
+                          <div className="font-bold text-black">{u.email || "Pending Login Sync"}</div>
+                          <div className="font-mono text-[10px] text-gray-400">{u.userId}</div>
+                        </td>
+                        
                         <td className="p-4 font-bold">{u.plan || "Starter"}</td>
-                        <td className="p-4 font-bold text-blue-500">{u.seo_words}</td>
-                        <td className="p-4 font-bold text-[#03d665]">{u.bypass_words}</td>
-                        <td className="p-4 pr-6 text-right">
-                          <button onClick={() => { setSelectedUser(u); setEditPlan(u.plan||"Starter"); setEditSeoWords(u.seo_words||0); setEditBypassWords(u.bypass_words||0); setIsBanned(u.banned||false); }} className="px-3 py-1 bg-black text-white text-xs font-bold rounded">Manage</button>
+                        
+                        <td className="p-4">
+                          <div className="text-xs font-bold text-blue-500">SEO: {u.seo_words}</div>
+                          <div className="text-xs font-bold text-[#03d665]">Bypass: {u.bypass_words}</div>
+                        </td>
+                        
+                        <td className="p-4 pr-6 text-right space-x-2">
+                          {/* 🚫 Direct Ban Button */}
+                          <button 
+                            onClick={() => handleQuickBan(u)} 
+                            className={`px-3 py-1.5 text-xs font-bold rounded border ${u.banned ? 'bg-white text-green-600 border-green-600' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white'}`}
+                          >
+                            {u.banned ? 'Unban' : 'Ban'}
+                          </button>
+
+                          <button onClick={() => { setSelectedUser(u); setEditPlan(u.plan||"Starter"); setEditSeoWords(u.seo_words||0); setEditBypassWords(u.bypass_words||0); setIsBanned(u.banned||false); }} className="px-3 py-1.5 bg-black text-white text-xs font-bold rounded">Manage</button>
                         </td>
                       </tr>
                     ))}
@@ -163,7 +194,7 @@ export default function AdminDashboard() {
           {activeTab === "plans" && (
             <div className="bg-white rounded-2xl border border-[#f1f1f1] overflow-hidden">
               <div className="p-6 border-b border-[#f1f1f1] flex justify-between items-center bg-[#fafbfe]">
-                <h3 className="font-bold text-lg text-[#000]">Manage Plans & Order</h3>
+                <h3 className="font-bold text-lg text-[#000]">Manage Plans</h3>
                 <button onClick={openNewPlanModal} className="px-4 py-2 bg-[#03d665] text-white text-sm font-bold rounded-lg">+ New Plan</button>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -176,10 +207,6 @@ export default function AdminDashboard() {
                       <div>SEO Words: <span className="text-blue-500">{p.seo_words}</span></div>
                       <div>Bypass Words: <span className="text-[#03d665]">{p.bypass_words}</span></div>
                     </div>
-                    <ul className="text-xs text-[#585858] space-y-1 mb-4">
-                       {(p.features || []).slice(0,2).map((f, idx) => <li key={idx}>✅ {f}</li>)}
-                       {(p.features || []).length > 2 && <li>...and more</li>}
-                    </ul>
                     <div className="flex gap-3">
                       <button onClick={() => openEditPlanModal(p)} className="flex-1 py-1.5 bg-black text-white text-xs font-bold rounded">Edit</button>
                       <button onClick={() => handleDeletePlan(p.planId)} className="px-4 py-1.5 bg-red-100 text-red-600 text-xs font-bold rounded">Delete</button>
@@ -232,15 +259,12 @@ export default function AdminDashboard() {
       {selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
           <div className="bg-white w-[500px] rounded-2xl shadow-2xl p-6">
-            <h2 className="text-lg font-extrabold text-[#000] mb-4">Manage Limits: {selectedUser.userId}</h2>
+            <h2 className="text-lg font-extrabold text-[#000] mb-4">Manage: {selectedUser.email || selectedUser.userId}</h2>
             <div className="flex gap-4 mb-4">
               <div className="flex-1"><label className="text-xs font-bold uppercase">Plan</label>
-                
-                {/* 🚀 SMART PLAN SELECTOR */}
                 <select value={editPlan} onChange={handlePlanChange} className="w-full border-2 p-2.5 rounded-xl font-bold">
                   {plansList.map(p => <option key={p.planId} value={p.name}>{p.name}</option>)}
                 </select>
-
               </div>
               <div className="flex-1"><label className="text-xs font-bold uppercase">Status</label>
                 <button onClick={() => setIsBanned(!isBanned)} className={`w-full p-2.5 rounded-xl font-bold border-2 ${isBanned ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{isBanned ? '🚫 BANNED' : '✅ ACTIVE'}</button>
