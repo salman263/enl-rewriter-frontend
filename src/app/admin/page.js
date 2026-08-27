@@ -19,18 +19,15 @@ export default function AdminDashboard() {
   const [couponsList, setCouponsList] = useState([]); 
   const [analytics, setAnalytics] = useState({ total_users: 0, total_rewrites: 0, total_words_processed: 0 });
   
-  // User Edit Modal States
   const [selectedUser, setSelectedUser] = useState(null);
   const [editPlan, setEditPlan] = useState("Starter");
   const [editSeoWords, setEditSeoWords] = useState(0);
   const [editBypassWords, setEditBypassWords] = useState(0);
   const [isBanned, setIsBanned] = useState(false);
 
-  // Plan Edit Modal States
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [planForm, setPlanForm] = useState({ planId: "", name: "", price: 0, seo_words: 0, bypass_words: 0, features: "", sort_order: 1, duration_days: 30 });
 
-  // Coupon Generate States
   const [genCouponCount, setGenCouponCount] = useState(10);
   const [genCouponPlan, setGenCouponPlan] = useState("");
   const [genCouponPrefix, setGenCouponPrefix] = useState("SUMO");
@@ -74,6 +71,25 @@ export default function AdminDashboard() {
       alert(`Successfully generated ${genCouponCount} coupons!`);
       fetchData();
     } catch (err) { alert("Failed to generate coupons"); }
+  };
+
+  // 🚀 NEW: Delete Single Coupon
+  const handleDeleteCoupon = async (code) => {
+    if (!window.confirm(`Are you sure you want to delete coupon: ${code}?`)) return;
+    try {
+      await fetch(`https://enl-rewriter-backend.onrender.com/api/admin/coupons/${code}`, { method: "DELETE" });
+      fetchData();
+    } catch (err) { alert("Failed to delete coupon"); }
+  };
+
+  // 🚀 NEW: Bulk Delete Coupons
+  const handleBulkDeleteCoupons = async () => {
+    if (!window.confirm("🚨 WARNING: Are you sure you want to DELETE ALL COUPONS? This cannot be undone!")) return;
+    try {
+      await fetch("https://enl-rewriter-backend.onrender.com/api/admin/coupons-bulk", { method: "DELETE" });
+      alert("All coupons deleted successfully!");
+      fetchData();
+    } catch (err) { alert("Failed to delete coupons"); }
   };
 
   // --- USER ACTIONS ---
@@ -248,12 +264,29 @@ export default function AdminDashboard() {
                   <button onClick={handleGenerateCoupons} className="bg-black text-white px-6 py-2.5 rounded font-bold shadow-md hover:bg-gray-800">Generate</button>
                 </div>
               </div>
+              
               <div className="bg-white rounded-2xl border border-[#f1f1f1] overflow-hidden">
-                <div className="p-6 border-b border-[#f1f1f1]"><h3 className="font-bold text-lg text-[#000]">All Codes ({couponsList.length})</h3></div>
+                <div className="p-6 border-b border-[#f1f1f1] flex justify-between items-center bg-[#fafbfe]">
+                  <h3 className="font-bold text-lg text-[#000]">All Codes ({couponsList.length})</h3>
+                  
+                  {/* 🚀 BULK DELETE BUTTON */}
+                  {couponsList.length > 0 && (
+                    <button onClick={handleBulkDeleteCoupons} className="px-4 py-2 bg-red-100 text-red-600 text-xs font-bold rounded hover:bg-red-200 transition">
+                      🗑️ Delete All Coupons
+                    </button>
+                  )}
+                </div>
+                
                 <div className="max-h-[500px] overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {couponsList.map((c, i) => (
-                    <div key={i} className={`p-4 rounded-xl border ${c.is_used ? 'bg-gray-50 border-gray-200' : 'bg-green-50 border-green-200'}`}>
-                      <div className="font-mono font-bold text-lg text-black tracking-wider mb-1">{c.code}</div>
+                    <div key={i} className={`p-4 rounded-xl border relative ${c.is_used ? 'bg-gray-50 border-gray-200' : 'bg-green-50 border-green-200'}`}>
+                      
+                      {/* 🚀 SINGLE DELETE BUTTON */}
+                      <button onClick={() => handleDeleteCoupon(c.code)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 font-bold text-lg leading-none" title="Delete Coupon">
+                        &times;
+                      </button>
+
+                      <div className="font-mono font-bold text-lg text-black tracking-wider mb-1 pr-6">{c.code}</div>
                       <div className="text-xs font-bold text-gray-500 mb-2">Plan: <span className="text-black">{c.plan_name}</span> ({c.duration_days == 0 ? "Lifetime" : c.duration_days + " Days"})</div>
                       {c.is_used ? (
                         <div className="text-[10px] bg-gray-200 text-gray-600 px-2 py-1 rounded inline-block font-bold">USED</div>
