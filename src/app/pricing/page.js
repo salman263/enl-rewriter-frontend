@@ -10,7 +10,6 @@ export default function PricingPage() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🚀 ডেটাবেস থেকে ডায়নামিক প্ল্যান নিয়ে আসা
   useEffect(() => {
     fetch("https://enl-rewriter-backend.onrender.com/api/plans")
       .then((res) => res.json())
@@ -21,109 +20,67 @@ export default function PricingPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const handleUpgrade = async (planName, credits) => {
-    if (!user) {
-      router.push("/sign-in");
-      return;
-    }
-    try {
-      const res = await fetch("https://enl-rewriter-backend.onrender.com/api/admin/upgrade-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, plan: planName, credits: credits }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`Successfully upgraded to ${planName}!`);
-        router.push("/dashboard");
-      } else {
-        alert("Failed to upgrade plan.");
-      }
-    } catch (err) {
-      alert("Something went wrong!");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#fafbfe] text-[#585858] font-sans flex flex-col">
-      
-      {/* 🚀 Professional Header (যেটা ফিরে এলো) */}
       <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-8 z-10 shadow-sm">
         <div className="flex items-center cursor-pointer" onClick={() => router.push("/dashboard")}>
-          <div className="text-[24px] font-extrabold text-[#000000]">
-            ZeroWord<span className="text-[#03d665]">Ai</span>
-          </div>
+          <div className="text-[24px] font-extrabold text-[#000000]">ZeroWord<span className="text-[#03d665]">Ai</span></div>
         </div>
         <div className="flex items-center gap-6">
-          <button 
-            onClick={() => router.push("/dashboard")}
-            className="text-sm font-medium hover:text-[#03d665] transition"
-          >
-            Dashboard
-          </button>
-          {user ? (
-            <UserButton afterSignOutUrl="/" />
-          ) : (
-            <button 
-              onClick={() => router.push("/sign-in")}
-              className="px-4 py-2 bg-[#03d665] text-white text-sm font-medium rounded-lg hover:bg-[#02a64e] transition"
-            >
-              Sign In
-            </button>
-          )}
+          <button onClick={() => router.push("/dashboard")} className="text-sm font-medium hover:text-[#03d665] transition">Dashboard</button>
+          {user ? <UserButton afterSignOutUrl="/" /> : <button onClick={() => router.push("/sign-in")} className="px-4 py-2 bg-[#03d665] text-white text-sm font-medium rounded-lg hover:bg-[#02a64e]">Sign In</button>}
         </div>
       </header>
 
-      {/* Pricing Content */}
       <div className="flex-1 py-16 px-6 max-w-6xl mx-auto w-full">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h1 className="text-4xl font-extrabold text-[#000000] mb-4 tracking-tight">
-            Simple, transparent pricing for <span className="text-[#03d665]">everyone</span>
-          </h1>
-          <p className="text-[#585858] text-base">
-            Choose the ideal plan to scale your content writing and completely bypass AI detectors effortlessly.
-          </p>
+          <h1 className="text-4xl font-extrabold text-[#000000] mb-4 tracking-tight">Simple, transparent pricing</h1>
+          <p className="text-[#585858] text-base">Choose the ideal plan to scale your content writing.</p>
         </div>
 
         {loading ? (
-          <div className="flex justify-center items-center h-[200px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div>
-          </div>
+          <div className="flex justify-center items-center h-[200px]"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#03d665]"></div></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {plans.map((plan, idx) => (
-              <div key={idx} className={`bg-white p-8 rounded-2xl shadow-[0_4px_20px_0_rgba(0,0,0,0.03)] border flex flex-col justify-between transition hover:border-[#e1e1e1] ${plan.price > 0 ? 'border-2 border-[#03d665] relative md:-translate-y-2 shadow-[0_10px_30px_0_rgba(3,214,101,0.1)]' : 'border-[#f1f1f1]'}`}>
+              <div key={idx} className={`bg-white p-8 rounded-2xl shadow-lg border flex flex-col justify-between transition hover:border-[#03d665] ${plan.price > 0 && plan.price < 99 ? 'border-2 border-[#03d665] relative md:-translate-y-2' : 'border-[#f1f1f1]'}`}>
                 
-                {/* Premium Badge */}
-                {plan.price > 0 && <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#03d665] text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider shadow-sm">Premium</span>}
+                {plan.price > 0 && plan.price < 99 && <span className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-[#03d665] text-white text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">Most Popular</span>}
                 
                 <div>
-                  <div className="text-sm font-bold uppercase tracking-wider text-[#585858] mb-2">{plan.name}</div>
-                  <p className="text-4xl font-extrabold text-[#000000] mb-6 mt-4">${plan.price} <span className="text-sm font-normal text-[#585858]">{plan.price > 0 ? '/month' : '/forever'}</span></p>
+                  <h3 className="text-2xl font-extrabold text-[#000000] mb-2">{plan.name}</h3>
+                  <p className="text-4xl font-extrabold text-[#000000] mb-6">
+                    {plan.price === 0 && plan.name.toLowerCase().includes("enterprise") ? "Custom" : `$${plan.price}`}
+                    {plan.price > 0 && <span className="text-sm font-normal text-[#585858]">/month</span>}
+                  </p>
                   
-                  <ul className="text-left text-[#585858] space-y-4 mb-8 text-sm border-t border-[#f1f1f1] pt-6">
-                    {plan.features.map((feature, fIdx) => (
-                      <li key={fIdx} className="flex items-center gap-2">✅ <span className="text-[#000000] font-medium">{feature}</span></li>
+                  <div className="bg-[#fafbfe] p-4 rounded-xl border border-[#f1f1f1] mb-6 space-y-2">
+                    <div className="text-sm font-bold text-blue-600">
+                      {plan.price === 0 && plan.name.toLowerCase().includes("enterprise") ? "Custom Rewrite Words/Mo" : `${plan.seo_words.toLocaleString()} Rewrite Words/Mo`}
+                    </div>
+                    <div className="text-sm font-bold text-[#03d665]">
+                      {plan.price === 0 && plan.name.toLowerCase().includes("enterprise") ? "Custom Pass AI Detection Words/Mo" : `${plan.bypass_words.toLocaleString()} Pass AI Detection Words/Mo`}
+                    </div>
+                  </div>
+                  
+                  <ul className="text-left text-[#585858] space-y-3 mb-8 text-sm">
+                    {(plan.features || []).map((feature, fIdx) => (
+                      <li key={fIdx} className="flex items-start gap-2">
+                        <span className="text-[#03d665] mt-0.5">✓</span> <span className="text-[#000000] font-medium leading-snug">{feature}</span>
+                      </li>
                     ))}
                   </ul>
                 </div>
                 
-                <button 
-                  onClick={() => plan.price === 0 ? router.push("/dashboard") : handleUpgrade(plan.name, plan.credits)}
-                  className={`w-full py-3 font-bold rounded-xl transition ${plan.price > 0 ? 'bg-[#03d665] text-white hover:bg-[#02a64e] shadow-md shadow-[#03d665]/20' : 'bg-[#fafbfe] border border-[#e1e1e1] text-[#000000] hover:bg-[#f1f1f1]'}`}
-                >
-                  {plan.price === 0 ? "Get Started" : `Upgrade to ${plan.name}`}
+                <button className={`w-full py-3 font-bold rounded-xl transition ${plan.price > 0 && plan.price < 99 ? 'bg-[#03d665] text-white hover:bg-[#02a64e] shadow-md' : 'bg-black text-white hover:bg-gray-800'}`}>
+                  {plan.name.toLowerCase().includes("enterprise") ? "Contact Us" : "Get Started"}
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* 🚀 Footer (যেটাও মিস হয়ে গেছিল!) */}
-      <footer className="py-6 border-t border-[#f1f1f1] text-center text-xs text-[#585858]">
-        © 2026 ZeroWordAi. All rights reserved.
-      </footer>
+      <footer className="py-6 border-t border-[#f1f1f1] text-center text-xs text-[#585858]">© 2026 ZeroWordAi. All rights reserved.</footer>
     </div>
   );
 }
