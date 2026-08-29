@@ -4,10 +4,9 @@ import { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import "react-quill-new/dist/quill.snow.css"; // 🚀 UPDATE THIS LINE
+import "react-quill-new/dist/quill.snow.css";
 
-// 🚀 WordAi-এর মত Premium Toolbar লোড করা হচ্ছে
-const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false }); // 🚀 UPDATE THIS LINE
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 export default function Dashboard() {
   const { isLoaded, user } = useUser(); 
@@ -35,7 +34,12 @@ export default function Dashboard() {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [viewArticle, setViewArticle] = useState(null); 
 
-  // 🚀 ടoolbar Options (Like Screenshot)
+  // 🚀 BULK REWRITE STATES
+  const [bulkData, setBulkData] = useState([]); // Array of {original, rewritten, status}
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkMode, setBulkMode] = useState("rewrite"); // rewrite or avoid_ai
+
   const quillModules = {
     toolbar: [
       ['bold', 'italic', 'underline'],
@@ -44,7 +48,6 @@ export default function Dashboard() {
     ]
   };
 
-  // 🚀 HTML Stripper (To calculate real words & send plain text to AI)
   const stripHtml = (html) => {
     if (typeof window === "undefined") return "";
     const tmp = document.createElement("DIV");
@@ -97,14 +100,9 @@ export default function Dashboard() {
     if (mode === "saved") fetchSavedArticles();
   }, [mode]);
 
-  // 🚀 FIX: Clear text when switching modes
   const handleModeChange = (newMode) => {
     if (newMode !== mode) {
-      setText("");
-      setResults([]);
-      setActiveTab(0);
-      setCopied(false);
-      setViewArticle(null);
+      setText(""); setResults([]); setActiveTab(0); setCopied(false); setViewArticle(null);
     }
     setMode(newMode);
   };
@@ -117,8 +115,8 @@ export default function Dashboard() {
     );
   }
 
-  const getTone = (value) => {
-    if (mode === "rewrite") {
+  const getTone = (value, currentMode = mode) => {
+    if (currentMode === "rewrite") {
       if (value == 1) return "Fluent";
       if (value == 2) return "Regular";
       if (value == 3) return "Creative";
@@ -136,13 +134,9 @@ export default function Dashboard() {
     const requiredLimitStr = mode === "rewrite" ? seoWords : bypassWords;
     const requiredLimit = parseInt(String(requiredLimitStr).replace(/,/g, ''));
     
-    if (requiredLimit < wordCount) {
-      return alert(`Limit Reached! You have ${requiredLimitStr} words left for ${mode === "rewrite" ? "SEO Rewrite" : "AI Bypass"}.`);
-    }
+    if (requiredLimit < wordCount) return alert(`Limit Reached! You have ${requiredLimitStr} words left.`);
 
-    setLoading(true);
-    setResults([]);
-    setCopied(false);
+    setLoading(true); setResults([]); setCopied(false);
 
     try {
       const res = await fetch("https://enl-rewriter-backend.onrender.com/api/rewrite", {
@@ -152,30 +146,124 @@ export default function Dashboard() {
 
       const data = await res.json();
       
-      if (data.error) {
-        setResults([data.error]);
-      } else if (data.rewrites && data.rewrites.length > 0) {
-        setResults(data.rewrites);
-        setActiveTab(0);
+      if (data.error) setResults([data.error]);
+      else if (data.rewrites && data.rewrites.length > 0) {
+        setResults(data.rewrites); setActiveTab(0);
         if (data.words_left !== undefined) {
           if (mode === "rewrite") setSeoWords(data.words_left.toLocaleString());
           else setBypassWords(data.words_left.toLocaleString());
         }
-      } else {
-        setResults(["No result found."]);
-      }
-    } catch (error) {
-      setResults(["Something went wrong! Please check your connection."]);
-    }
+      } else setResults(["No result found."]);
+    } catch (error) { setResults(["Something went wrong!"]); }
     setLoading(false);
   };
 
-  const handleCopy = () => {
-    if (results[activeTab]) {
-      navigator.clipboard.writeText(results[activeTab]);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  // 🚀 BULK FILE UPLOAD & PARSE LOGIC
+  const handleBulkFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target.result;
+      const lines = content.split('\n').filter(line => line.trim().length > 5);
+      
+      if (lines.length > 50) {
+        alert("Maximum 50 articles allowed per batch!");
+        return;
+      }
+      
+      const parsedData = lines.map((line, index) => ({
+        id: index,
+        original: line.trim(),
+        rewritten: "",
+        status: "pending" // pending, processing, done, error
+      }));
+      setBulkData(parsedData);
+      setBulkProgress(0);
+    };
+    reader.readAsText(file);
+    e.target.value = null; // reset input
+  };
+
+  // 🚀 BULK PROCESSING LOGIC (Loops through API)
+  const processBulkRewrite = async () => {
+    if (bulkData.length === 0) return;
+    setIsBulkProcessing(true);
+    setBulkProgress(0);
+
+    let updatedData = [...bulkData];
+
+    for (let i = 0; i < updatedData.length; i++) {
+      if (updatedData[i].status === "done") continue;
+
+      updatedData[i].status = "processing";
+      setBulkData([...updatedData]);
+
+      const itemWordCount = updatedData[i].original.split(/\s+/).length;
+      const requiredLimitStr = bulkMode === "rewrite" ? seoWords : bypassWords;
+      const requiredLimit = parseInt(String(requiredLimitStr).replace(/,/g, ''));
+
+      if (requiredLimit < itemWordCount) {
+        updatedData[i].status = "error";
+        updatedData[i].rewritten = "Limit Exceeded";
+        setBulkData([...updatedData]);
+        continue;
+      }
+
+      try {
+        const res = await fetch("https://enl-rewriter-backend.onrender.com/api/rewrite", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            text: updatedData[i].original, 
+            tone: getTone(2, bulkMode), // default regular tone for bulk
+            num_rewrites: 1, 
+            mode: bulkMode, 
+            userId: user.id 
+          }),
+        });
+
+        const data = await res.json();
+        
+        if (data.rewrites && data.rewrites.length > 0) {
+          updatedData[i].rewritten = data.rewrites[0];
+          updatedData[i].status = "done";
+          if (data.words_left !== undefined) {
+            if (bulkMode === "rewrite") setSeoWords(data.words_left.toLocaleString());
+            else setBypassWords(data.words_left.toLocaleString());
+          }
+        } else {
+          updatedData[i].status = "error";
+          updatedData[i].rewritten = data.error || "Failed";
+        }
+      } catch (error) {
+        updatedData[i].status = "error";
+        updatedData[i].rewritten = "Network Error";
+      }
+
+      setBulkData([...updatedData]);
+      setBulkProgress(Math.round(((i + 1) / updatedData.length) * 100));
     }
+
+    setIsBulkProcessing(false);
+    alert("Batch Processing Completed!");
+  };
+
+  // 🚀 DOWNLOAD CSV
+  const downloadBulkResults = () => {
+    const csvContent = "Original,Rewritten\n" + bulkData.map(e => `"${e.original.replace(/"/g, '""')}","${e.rewritten.replace(/"/g, '""')}"`).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Bulk_Results.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCopy = () => {
+    if (results[activeTab]) { navigator.clipboard.writeText(results[activeTab]); setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
   const handleSaveCurrentArticle = async () => {
@@ -211,17 +299,12 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.success) {
         alert("🎉 Coupon Redeemed Successfully! Your plan has been upgraded.");
-        setShowCouponModal(false);
-        setCouponCode("");
-        fetchUserLimits();
-      } else {
-        alert(data.error || "Invalid or used coupon code.");
-      }
+        setShowCouponModal(false); setCouponCode(""); fetchUserLimits();
+      } else alert(data.error || "Invalid or used coupon code.");
     } catch (err) { alert("Failed to redeem coupon."); }
     setRedeemLoading(false);
   };
 
-  // 🚀 Output Highlighter for Quill
   const getHighlightedHtml = (originalHtml, newText) => {
     if (!highlight || !originalHtml) return newText;
     const originalText = stripHtml(originalHtml);
@@ -231,9 +314,7 @@ export default function Dashboard() {
     const htmlArray = newWordsArray.map((word) => {
       if (word.trim() === "") return word;
       const cleanWord = word.toLowerCase().replace(/[^\w]/g, "");
-      if (cleanWord && !origWords.includes(cleanWord)) {
-        return `<span style="background-color: #e1fff7; color: #03d665; font-weight: 500; padding: 0 3px; border-radius: 4px;">${word}</span>`;
-      }
+      if (cleanWord && !origWords.includes(cleanWord)) return `<span style="background-color: #e1fff7; color: #03d665; font-weight: 500; padding: 0 3px; border-radius: 4px;">${word}</span>`;
       return word;
     });
     return htmlArray.join('');
@@ -257,42 +338,24 @@ export default function Dashboard() {
       return (
         <div className="max-w-[1400px] mx-auto bg-white rounded-[10px] shadow-[0_0_20px_0_rgba(0,0,0,0.05)] border border-[#f1f1f1] overflow-hidden">
           <div className="flex flex-col lg:flex-row min-h-[500px]">
-            
-            {/* Input Area (With Quill) */}
             <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[#f1f1f1] relative quill-wrapper">
               <div className="px-6 py-3 flex justify-between bg-[#fafbfe] border-b border-[#f1f1f1]">
                 <span className="text-[13px] font-bold text-[#000000] uppercase">Original Content</span>
                 <button onClick={() => setText("")} className="text-[13px] font-medium hover:text-red-500">Clear</button>
               </div>
-              <ReactQuill
-                theme="snow"
-                value={text}
-                onChange={setText}
-                modules={quillModules}
-                placeholder={mode === "rewrite" ? "Enter your text to rewrite..." : "Paste AI text here to bypass detection..."}
-                className="flex-1 w-full bg-white"
-              />
+              <ReactQuill theme="snow" value={text} onChange={setText} modules={quillModules} placeholder={mode === "rewrite" ? "Enter your text to rewrite..." : "Paste AI text here to bypass detection..."} className="flex-1 w-full bg-white" />
               <div className="px-6 py-2 text-[12px] text-[#c2c2c2] font-medium border-t border-[#f1f1f1] bg-white">Words: {wordCount}</div>
             </div>
 
-            {/* Output Area (With Quill) */}
             <div className="flex-1 flex flex-col relative bg-[#fafbfe] quill-wrapper">
               <div className="px-6 py-3 flex items-center justify-between border-b border-[#f1f1f1] bg-[#fafbfe]">
                 <div className="flex gap-4">
                   {results.length > 0 ? results.map((_, idx) => (
-                    <button 
-                      key={idx} onClick={() => setActiveTab(idx)}
-                      className={`text-[13px] font-bold pb-1 border-b-2 transition-all ${activeTab === idx ? 'border-[#03d665] text-[#03d665]' : 'border-transparent text-[#c2c2c2] hover:text-[#585858]'}`}
-                    >
+                    <button key={idx} onClick={() => setActiveTab(idx)} className={`text-[13px] font-bold pb-1 border-b-2 transition-all ${activeTab === idx ? 'border-[#03d665] text-[#03d665]' : 'border-transparent text-[#c2c2c2] hover:text-[#585858]'}`}>
                       Version {idx + 1}
                     </button>
-                  )) : (
-                    <span className="text-[13px] font-bold text-[#03d665] uppercase">
-                      {mode === "rewrite" ? "Rewritten Content" : "Humanized Content"}
-                    </span>
-                  )}
+                  )) : ( <span className="text-[13px] font-bold text-[#03d665] uppercase">{mode === "rewrite" ? "Rewritten Content" : "Humanized Content"}</span> )}
                 </div>
-                
                 {results.length > 0 && (
                   <div className="flex gap-2">
                     <button onClick={() => setHighlight(!highlight)} className={`text-[12px] font-medium px-2 py-1 rounded border transition-all ${highlight ? 'bg-[#e1fff7] text-[#03d665] border-[#03d665]' : 'bg-white text-[#585858] border-[#f1f1f1]'}`}>✨ Highlights</button>
@@ -301,56 +364,32 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-
-              <ReactQuill
-                theme="snow"
-                value={results.length > 0 ? getHighlightedHtml(text, results[activeTab]) : ""}
-                readOnly={true}
-                modules={quillModules}
-                placeholder={mode === "rewrite" ? "Your rewritten text will appear here." : "Your humanized text will appear here."}
-                className="flex-1 w-full bg-white output-quill"
-              />
+              <ReactQuill theme="snow" value={results.length > 0 ? getHighlightedHtml(text, results[activeTab]) : ""} readOnly={true} modules={quillModules} placeholder={mode === "rewrite" ? "Your rewritten text will appear here." : "Your humanized text will appear here."} className="flex-1 w-full bg-white output-quill" />
             </div>
           </div>
 
-          {/* Dynamic Bottom Settings */}
           <div className="bg-white border-t border-[#f1f1f1] p-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="w-full md:w-[150px]">
                  <div className="mb-2 text-[14px] font-bold text-[#000000]">Variations:</div>
-                 <select 
-                    className="w-full text-[13px] bg-white border border-[#e1e1e1] rounded px-3 py-2 focus:outline-none cursor-pointer"
-                    value={numRewrites} onChange={(e) => setNumRewrites(parseInt(e.target.value))}
-                 >
+                 <select className="w-full text-[13px] bg-white border border-[#e1e1e1] rounded px-3 py-2 focus:outline-none cursor-pointer" value={numRewrites} onChange={(e) => setNumRewrites(parseInt(e.target.value))}>
                     <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
                  </select>
               </div>
 
               <div className="flex-1 w-full max-w-sm">
-                 <div className="mb-2 text-[14px] font-bold text-[#000000]">
-                   {mode === "rewrite" ? "Tone Settings:" : "Bypass Strength:"}
-                 </div>
+                 <div className="mb-2 text-[14px] font-bold text-[#000000]">{mode === "rewrite" ? "Tone Settings:" : "Bypass Strength:"}</div>
                  <div className="flex justify-between text-[11px] text-[#585858] mb-2 font-medium">
                     <span className={sliderValue == 1 ? "text-[#03d665]" : ""}>{mode === "rewrite" ? "Conservative" : "Basic Bypass"}</span>
                     <span className={sliderValue == 2 ? "text-[#03d665]" : ""}>{mode === "rewrite" ? "Regular" : "Advanced"}</span>
                     <span className={sliderValue == 3 ? "text-[#03d665]" : ""}>{mode === "rewrite" ? "Adventurous" : "Max Human"}</span>
                  </div>
-                 <input 
-                    type="range" min="1" max="3" step="1" value={sliderValue} onChange={(e) => setSliderValue(e.target.value)}
-                    className="w-full h-2 bg-[#f1f1f1] rounded-lg appearance-none cursor-pointer outline-none"
-                    style={{ background: `linear-gradient(to right, #03d665 ${(sliderValue - 1) * 50}%, #f1f1f1 ${(sliderValue - 1) * 50}%)`, accentColor: '#03d665' }}
-                 />
+                 <input type="range" min="1" max="3" step="1" value={sliderValue} onChange={(e) => setSliderValue(e.target.value)} className="w-full h-2 bg-[#f1f1f1] rounded-lg appearance-none cursor-pointer outline-none" style={{ background: `linear-gradient(to right, #03d665 ${(sliderValue - 1) * 50}%, #f1f1f1 ${(sliderValue - 1) * 50}%)`, accentColor: '#03d665' }} />
               </div>
 
               <div className="w-full md:w-auto text-right">
-                <button
-                  onClick={handleRewrite} disabled={loading || !plainText}
-                  className={`w-full md:w-[160px] h-[50px] rounded-[7px] text-[16px] font-medium text-white transition-colors flex items-center justify-center gap-2 ${loading || !plainText ? "opacity-50 cursor-not-allowed" : "hover:bg-[#02a64e]"}`}
-                  style={{ backgroundColor: '#03d665' }}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>
-                  ) : ( mode === "rewrite" ? "Rewrite" : "Humanize Text" )}
+                <button onClick={handleRewrite} disabled={loading || !plainText} className={`w-full md:w-[160px] h-[50px] rounded-[7px] text-[16px] font-medium text-white transition-colors flex items-center justify-center gap-2 ${loading || !plainText ? "opacity-50 cursor-not-allowed" : "hover:bg-[#02a64e]"}`} style={{ backgroundColor: '#03d665' }}>
+                  {loading ? ( <span className="flex items-center gap-2">Processing...</span> ) : ( mode === "rewrite" ? "Rewrite" : "Humanize Text" )}
                 </button>
               </div>
             </div>
@@ -389,9 +428,7 @@ export default function Dashboard() {
       return (
         <div className="max-w-[1000px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
           <h2 className="text-2xl font-bold text-black mb-6">Saved Articles</h2>
-          {loadingSaved ? (
-             <div className="text-center py-10">Loading...</div>
-          ) : savedArticles.length === 0 ? (
+          {loadingSaved ? ( <div className="text-center py-10">Loading...</div> ) : savedArticles.length === 0 ? (
             <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
               <div className="text-4xl mb-4">📂</div>
               <p className="text-gray-500 font-medium">You don't have any saved articles yet.</p>
@@ -408,9 +445,7 @@ export default function Dashboard() {
                       </span>
                       <span className="text-xs text-gray-400">{new Date(article.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="text-sm font-medium text-black line-clamp-2">
-                      {article.original_text.substring(0, 150)}...
-                    </div>
+                    <div className="text-sm font-medium text-black line-clamp-2">{article.original_text.substring(0, 150)}...</div>
                   </div>
                   <div className="flex gap-2 mt-4 md:mt-0">
                     <button onClick={() => setViewArticle(article)} className="px-4 py-2 bg-white border rounded font-bold text-sm text-black hover:bg-gray-50">View</button>
@@ -424,17 +459,73 @@ export default function Dashboard() {
       );
     }
 
-    // 📚 BULK REWRITE UI
+    // 📚 BULK REWRITE UI (NEW & POWERFUL!)
     if (mode === "bulk") return (
       <div className="max-w-[1000px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
-        <h2 className="text-2xl font-bold text-black mb-2">Bulk Rewrite</h2>
-        <p className="text-gray-500 text-sm mb-6">Upload a CSV/TXT file or paste multiple articles to process them at once.</p>
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:bg-gray-50 transition cursor-pointer">
-          <div className="text-4xl mb-4">📄</div>
-          <div className="font-bold text-black mb-1">Click to Upload File</div>
-          <div className="text-xs text-gray-400">Supports .txt and .csv (Max 50 articles per batch)</div>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-black mb-1">Bulk Rewrite</h2>
+            <p className="text-gray-500 text-sm">Upload a .txt file (one article per line) to process up to 50 articles at once.</p>
+          </div>
+          <select value={bulkMode} onChange={(e)=>setBulkMode(e.target.value)} disabled={isBulkProcessing} className="bg-gray-50 border p-2 rounded text-sm font-bold text-black outline-none">
+            <option value="rewrite">SEO Rewrite Mode</option>
+            <option value="avoid_ai">AI Bypass Mode</option>
+          </select>
         </div>
-        <button className="mt-6 w-full py-3 bg-[#03d665] text-white font-bold rounded-lg opacity-50 cursor-not-allowed">Process Batch (Coming Soon)</button>
+
+        {/* Upload Box */}
+        {bulkData.length === 0 ? (
+          <label className="border-2 border-dashed border-gray-300 rounded-xl p-16 flex flex-col items-center justify-center hover:bg-gray-50 transition cursor-pointer">
+            <div className="text-5xl mb-4">📁</div>
+            <div className="font-bold text-black mb-2 text-lg">Click to Upload TXT File</div>
+            <div className="text-xs text-gray-400">Ensure each paragraph/article is on a new line (Max 50)</div>
+            <input type="file" accept=".txt, .csv" className="hidden" onChange={handleBulkFileUpload} />
+          </label>
+        ) : (
+          <div>
+            {/* Progress Bar & Actions */}
+            <div className="bg-gray-50 p-6 rounded-xl border mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex-1 w-full">
+                <div className="flex justify-between text-sm font-bold text-black mb-2">
+                  <span>Progress: {bulkProgress}%</span>
+                  <span>{bulkData.filter(d=>d.status==='done').length} / {bulkData.length} Done</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-[#03d665] h-2.5 rounded-full transition-all duration-300" style={{ width: `${bulkProgress}%` }}></div>
+                </div>
+              </div>
+              <div className="flex gap-2 w-full md:w-auto">
+                {!isBulkProcessing && bulkProgress < 100 && (
+                  <button onClick={processBulkRewrite} className="px-6 py-2 bg-black text-white font-bold rounded hover:bg-gray-800">Start Processing</button>
+                )}
+                {!isBulkProcessing && (
+                  <button onClick={() => {setBulkData([]); setBulkProgress(0);}} className="px-4 py-2 border border-red-200 text-red-500 font-bold rounded hover:bg-red-50">Clear</button>
+                )}
+                {bulkProgress > 0 && !isBulkProcessing && (
+                  <button onClick={downloadBulkResults} className="px-6 py-2 bg-[#03d665] text-white font-bold rounded hover:bg-[#02a64e]">Download CSV</button>
+                )}
+              </div>
+            </div>
+
+            {/* List of articles */}
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+              {bulkData.map((item, i) => (
+                <div key={item.id} className="p-4 border rounded-lg flex items-center justify-between bg-white">
+                  <div className="flex-1 pr-4">
+                    <div className="text-xs text-gray-400 mb-1">Article #{i + 1}</div>
+                    <div className="text-sm text-black font-medium line-clamp-1">{item.original}</div>
+                  </div>
+                  <div>
+                    {item.status === 'pending' && <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded text-xs font-bold">Pending</span>}
+                    {item.status === 'processing' && <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded text-xs font-bold animate-pulse">Processing...</span>}
+                    {item.status === 'done' && <span className="px-3 py-1 bg-green-100 text-green-600 rounded text-xs font-bold">Done</span>}
+                    {item.status === 'error' && <span className="px-3 py-1 bg-red-100 text-red-600 rounded text-xs font-bold" title={item.rewritten}>Error</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
 
@@ -525,85 +616,72 @@ export default function Dashboard() {
   };
 
   return (
-    <>
-      {/* 🚀 Global Custom CSS For Quill Editor to Match UI */}
-      <style jsx global>{`
-        .quill-wrapper { display: flex; flex-direction: column; height: 100%; }
-        .quill-wrapper .quill { display: flex; flex-direction: column; flex: 1; }
-        .quill-wrapper .ql-toolbar { border: none !important; border-bottom: 1px solid #f1f1f1 !important; background: #ffffff; padding: 12px 20px !important; }
-        .quill-wrapper .ql-container { flex: 1; border: none !important; font-size: 14px !important; font-family: inherit !important; color: #585858 !important; overflow-y: auto; }
-        .quill-wrapper .ql-editor { min-height: 250px; padding: 24px !important; line-height: 1.8; }
-        .quill-wrapper .ql-editor:focus { outline: none; }
-        .output-quill .ql-toolbar { background: #fafbfe !important; }
-      `}</style>
-
-      <div className="flex h-screen bg-[#fafbfe] text-[#585858] font-sans overflow-hidden selection:bg-[#03d665] selection:text-white">
-        
-        <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
-          <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
-            <div className="text-[26px] font-bold tracking-tight text-[#000000] cursor-pointer" onClick={() => router.push("/")}>
-              ZeroWord<span className="text-[#03d665]">Ai</span>
-            </div>
-          </div>
-          <div className="py-4 flex-1 overflow-y-auto">
-            {sidebarMenus.map((menu) => (
-              <button 
-                key={menu.id} onClick={() => handleModeChange(menu.id)}
-                className={`w-full flex items-center px-6 py-[12px] font-medium text-[15px] transition-colors ${mode === menu.id ? "bg-[#e1fff7] text-[#03d665] border-r-4 border-[#03d665]" : "text-[#585858] hover:text-[#03d665]"}`}
-              >
-                <span className="mr-3 text-lg">{menu.icon}</span> {menu.label}
-              </button>
-            ))}
+    <div className="flex h-screen bg-[#fafbfe] text-[#585858] font-sans overflow-hidden selection:bg-[#03d665] selection:text-white">
+      
+      <div className="w-[260px] bg-white border-r border-[#f1f1f1] flex flex-col shadow-sm z-20 hidden lg:flex">
+        <div className="h-[75px] flex items-center px-6 border-b border-[#f1f1f1]">
+          <div className="text-[26px] font-bold tracking-tight text-[#000000] cursor-pointer" onClick={() => router.push("/")}>
+            ZeroWord<span className="text-[#03d665]">Ai</span>
           </div>
         </div>
-
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-6 z-10 shadow-sm">
-            <div className="flex items-center lg:hidden"><div className="text-[22px] font-bold text-[#000000]">ZeroWord<span className="text-[#03d665]">Ai</span></div></div>
-            
-            <div className="hidden lg:block text-[#000000] font-bold text-lg">
-              {sidebarMenus.find(m => m.id === mode)?.label || "Dashboard"}
-            </div>
-            
-            <div className="flex items-center gap-4 sm:gap-6">
-              <div className="hidden md:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
-                {mode === "rewrite" ? (<>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>) : (<>Bypass Words: <span className="text-[#03d665] ml-1.5">{bypassWords}</span></>)}
-              </div>
-              <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold bg-[#e1fff7] text-[#03d665] px-3 py-1.5 rounded-full hover:bg-[#03d665] hover:text-white transition">🎁 Redeem Code</button>
-              <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
-              <UserButton afterSignOutUrl="/" />
-            </div>
-          </header>
-
-          <div className="flex-1 overflow-auto p-4 md:p-8 bg-[#fafbfe]">
-            {renderContent()}
-          </div>
+        <div className="py-4 flex-1 overflow-y-auto">
+          {sidebarMenus.map((menu) => (
+            <button 
+              key={menu.id} onClick={() => handleModeChange(menu.id)}
+              className={`w-full flex items-center px-6 py-[12px] font-medium text-[15px] transition-colors ${mode === menu.id ? "bg-[#e1fff7] text-[#03d665] border-r-4 border-[#03d665]" : "text-[#585858] hover:text-[#03d665]"}`}
+            >
+              <span className="mr-3 text-lg">{menu.icon}</span> {menu.label}
+            </button>
+          ))}
         </div>
-
-        {showCouponModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative">
-              <button onClick={() => setShowCouponModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">&times;</button>
-              <div className="text-center mb-6">
-                <div className="text-4xl mb-2">🎁</div>
-                <h2 className="text-xl font-extrabold text-black">Redeem Promo Code</h2>
-                <p className="text-sm text-gray-500 mt-1">Enter your promo code to unlock premium features.</p>
-              </div>
-              <input 
-                type="text" placeholder="e.g. SUMO-A1B2C3D4" 
-                className="w-full border-2 border-gray-200 focus:border-[#03d665] p-3 rounded-xl outline-none font-mono font-bold text-center text-lg text-black mb-4 uppercase"
-                value={couponCode} onChange={(e) => setCouponCode(e.target.value)}
-              />
-              <button 
-                onClick={handleRedeem} disabled={redeemLoading || !couponCode}
-                className="w-full py-3 bg-[#03d665] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#02a64e] disabled:opacity-50 transition"
-              >
-                {redeemLoading ? "Verifying..." : "Redeem Now"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
-    </>
+
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <header className="h-[75px] bg-white border-b border-[#f1f1f1] flex items-center justify-between px-6 z-10 shadow-sm">
+          <div className="flex items-center lg:hidden"><div className="text-[22px] font-bold text-[#000000]">ZeroWord<span className="text-[#03d665]">Ai</span></div></div>
+          
+          <div className="hidden lg:block text-[#000000] font-bold text-lg">
+            {sidebarMenus.find(m => m.id === mode)?.label || "Dashboard"}
+          </div>
+          
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="hidden md:flex items-center bg-[#fafbfe] border border-[#f1f1f1] px-4 py-1.5 rounded-full text-[12px] font-bold text-[#585858]">
+              {mode === "rewrite" ? (<>SEO Words: <span className="text-blue-500 ml-1.5">{seoWords}</span></>) : (<>Bypass Words: <span className="text-[#03d665] ml-1.5">{bypassWords}</span></>)}
+            </div>
+            <button onClick={() => setShowCouponModal(true)} className="text-xs font-bold bg-[#e1fff7] text-[#03d665] px-3 py-1.5 rounded-full hover:bg-[#03d665] hover:text-white transition">🎁 Redeem Code</button>
+            <button onClick={() => router.push("/pricing")} className="hidden sm:block text-xs font-bold text-[#000] hover:text-[#03d665]">Upgrade</button>
+            <UserButton afterSignOutUrl="/" />
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-auto p-4 md:p-8 bg-[#fafbfe]">
+          {renderContent()}
+        </div>
+      </div>
+
+      {showCouponModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative">
+            <button onClick={() => setShowCouponModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-xl">&times;</button>
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-2">🎁</div>
+              <h2 className="text-xl font-extrabold text-black">Redeem Promo Code</h2>
+              <p className="text-sm text-gray-500 mt-1">Enter your promo code to unlock premium features.</p>
+            </div>
+            <input 
+              type="text" placeholder="e.g. SUMO-A1B2C3D4" 
+              className="w-full border-2 border-gray-200 focus:border-[#03d665] p-3 rounded-xl outline-none font-mono font-bold text-center text-lg text-black mb-4 uppercase"
+              value={couponCode} onChange={(e) => setCouponCode(e.target.value)}
+            />
+            <button 
+              onClick={handleRedeem} disabled={redeemLoading || !couponCode}
+              className="w-full py-3 bg-[#03d665] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#02a64e] disabled:opacity-50 transition"
+            >
+              {redeemLoading ? "Verifying..." : "Redeem Now"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
