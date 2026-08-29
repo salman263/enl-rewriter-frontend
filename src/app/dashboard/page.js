@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import "react-quill/dist/quill.snow.css";
+import "react-quill-new/dist/quill.snow.css"; // 🚀 UPDATE THIS LINE
 
 // 🚀 WordAi-এর মত Premium Toolbar লোড করা হচ্ছে
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false }); // 🚀 UPDATE THIS LINE
 
 export default function Dashboard() {
   const { isLoaded, user } = useUser(); 
