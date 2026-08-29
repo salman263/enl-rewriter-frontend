@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [seoWords, setSeoWords] = useState("...");
   const [bypassWords, setBypassWords] = useState("...");
   const [planName, setPlanName] = useState("...");
+  const [userApiKey, setUserApiKey] = useState("Loading..."); // 🚀 API KEY STATE
   
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [couponCode, setCouponCode] = useState("");
@@ -35,10 +36,10 @@ export default function Dashboard() {
   const [viewArticle, setViewArticle] = useState(null); 
 
   // 🚀 BULK REWRITE STATES
-  const [bulkData, setBulkData] = useState([]); // Array of {original, rewritten, status}
+  const [bulkData, setBulkData] = useState([]);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  const [bulkMode, setBulkMode] = useState("rewrite"); // rewrite or avoid_ai
+  const [bulkMode, setBulkMode] = useState("rewrite");
 
   const quillModules = {
     toolbar: [
@@ -67,6 +68,7 @@ export default function Dashboard() {
             setSeoWords(data.seo_words !== undefined ? data.seo_words.toLocaleString() : "...");
             setBypassWords(data.bypass_words !== undefined ? data.bypass_words.toLocaleString() : "...");
             setPlanName(data.plan || "Free");
+            setUserApiKey(data.api_key || "No API Key found");
           }
         })
         .catch((err) => console.error("Failed to fetch limits"));
@@ -177,16 +179,16 @@ export default function Dashboard() {
         id: index,
         original: line.trim(),
         rewritten: "",
-        status: "pending" // pending, processing, done, error
+        status: "pending" 
       }));
       setBulkData(parsedData);
       setBulkProgress(0);
     };
     reader.readAsText(file);
-    e.target.value = null; // reset input
+    e.target.value = null; 
   };
 
-  // 🚀 BULK PROCESSING LOGIC (Loops through API)
+  // 🚀 BULK PROCESSING LOGIC
   const processBulkRewrite = async () => {
     if (bulkData.length === 0) return;
     setIsBulkProcessing(true);
@@ -216,7 +218,7 @@ export default function Dashboard() {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             text: updatedData[i].original, 
-            tone: getTone(2, bulkMode), // default regular tone for bulk
+            tone: getTone(2, bulkMode), 
             num_rewrites: 1, 
             mode: bulkMode, 
             userId: user.id 
@@ -266,6 +268,8 @@ export default function Dashboard() {
     if (results[activeTab]) { navigator.clipboard.writeText(results[activeTab]); setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
+  const handleCopyText = (txt) => { navigator.clipboard.writeText(txt); alert("Copied!"); };
+
   const handleSaveCurrentArticle = async () => {
     if (!results[activeTab]) return;
     try {
@@ -305,6 +309,21 @@ export default function Dashboard() {
     setRedeemLoading(false);
   };
 
+  // 🚀 REGENERATE API KEY FUNCTION
+  const handleRegenerateKey = async () => {
+    if(!window.confirm("Are you sure? Your old API key will stop working immediately.")) return;
+    try {
+      const res = await fetch(`https://enl-rewriter-backend.onrender.com/api/user/${user.id}/regenerate-key`, { method: "POST" });
+      const data = await res.json();
+      if(data.success) {
+        setUserApiKey(data.api_key);
+        alert("New API Key generated successfully!");
+      } else {
+        alert("Failed to regenerate key");
+      }
+    } catch(e) { alert("Network error. Failed to regenerate key"); }
+  };
+
   const getHighlightedHtml = (originalHtml, newText) => {
     if (!highlight || !originalHtml) return newText;
     const originalText = stripHtml(originalHtml);
@@ -325,7 +344,7 @@ export default function Dashboard() {
     { id: "avoid_ai", icon: "🛡️", label: "Avoid AI Detection" },
     { id: "saved", icon: "💾", label: "Saved Articles" },
     { id: "bulk", icon: "📚", label: "Bulk Rewrite" },
-    { id: "api", icon: "⚙️", label: "API" },
+    { id: "api", icon: "⚙️", label: "Developer API" },
     { id: "settings", icon: "🛠️", label: "Rewrite Settings" },
     { id: "usage", icon: "📊", label: "Usage Info" },
     { id: "affiliate", icon: "🤝", label: "Affiliate" },
@@ -334,6 +353,7 @@ export default function Dashboard() {
   ];
 
   const renderContent = () => {
+    // ✍️ MAIN REWRITE UI
     if (mode === "rewrite" || mode === "avoid_ai") {
       return (
         <div className="max-w-[1400px] mx-auto bg-white rounded-[10px] shadow-[0_0_20px_0_rgba(0,0,0,0.05)] border border-[#f1f1f1] overflow-hidden">
@@ -459,7 +479,7 @@ export default function Dashboard() {
       );
     }
 
-    // 📚 BULK REWRITE UI (NEW & POWERFUL!)
+    // 📚 BULK REWRITE UI
     if (mode === "bulk") return (
       <div className="max-w-[1000px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
         <div className="flex justify-between items-center mb-6">
@@ -473,7 +493,6 @@ export default function Dashboard() {
           </select>
         </div>
 
-        {/* Upload Box */}
         {bulkData.length === 0 ? (
           <label className="border-2 border-dashed border-gray-300 rounded-xl p-16 flex flex-col items-center justify-center hover:bg-gray-50 transition cursor-pointer">
             <div className="text-5xl mb-4">📁</div>
@@ -483,7 +502,6 @@ export default function Dashboard() {
           </label>
         ) : (
           <div>
-            {/* Progress Bar & Actions */}
             <div className="bg-gray-50 p-6 rounded-xl border mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex-1 w-full">
                 <div className="flex justify-between text-sm font-bold text-black mb-2">
@@ -507,7 +525,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* List of articles */}
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
               {bulkData.map((item, i) => (
                 <div key={item.id} className="p-4 border rounded-lg flex items-center justify-between bg-white">
@@ -531,14 +548,69 @@ export default function Dashboard() {
 
     // ⚙️ API UI
     if (mode === "api") return (
-      <div className="max-w-[1000px] mx-auto bg-white rounded-xl shadow-sm border border-[#f1f1f1] p-8">
-        <h2 className="text-2xl font-bold text-black mb-2">API Access</h2>
-        <p className="text-gray-500 text-sm mb-6">Integrate ZeroWordAi into your own applications.</p>
-        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-6">
-          <label className="block text-xs font-bold text-black uppercase mb-2">Your Secret API Key</label>
-          <div className="flex gap-4">
-            <input type="password" value="sk-live-xxxxxxxxxxxxxxxxxxxxxxxx" readOnly className="flex-1 p-3 border rounded outline-none bg-white font-mono" />
-            <button className="px-6 py-3 bg-black text-white rounded font-bold hover:bg-gray-800">Copy Key</button>
+      <div className="max-w-[1000px] mx-auto">
+        <h2 className="text-2xl font-bold text-black mb-2">Developer API</h2>
+        <p className="text-gray-500 text-sm mb-6">Integrate ZeroWordAi seamlessly into your own applications, WordPress plugins, or automated workflows.</p>
+        
+        {/* API Key Box */}
+        <div className="bg-white p-6 rounded-xl border border-[#f1f1f1] shadow-sm mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="w-full flex-1">
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Your Secret API Key</label>
+            <div className="flex gap-2">
+              <input type="text" value={userApiKey} readOnly className="flex-1 p-3 border rounded-lg outline-none bg-gray-50 font-mono text-sm text-black font-bold" />
+              <button onClick={() => handleCopyText(userApiKey)} className="px-5 py-3 bg-black text-white rounded-lg font-bold hover:bg-gray-800">Copy</button>
+            </div>
+            <p className="text-[11px] text-red-400 mt-2 font-medium">⚠️ Do not share your API key. It will deduct words directly from your account.</p>
+          </div>
+          <div className="w-full md:w-auto">
+             <button onClick={handleRegenerateKey} className="w-full px-5 py-3 border border-gray-300 text-black rounded-lg font-bold hover:bg-gray-50 text-sm">🔄 Regenerate Key</button>
+          </div>
+        </div>
+
+        {/* API Documentation */}
+        <div className="bg-white p-6 rounded-xl border border-[#f1f1f1] shadow-sm">
+          <h3 className="text-lg font-bold text-black mb-4">API Documentation</h3>
+          
+          <div className="mb-4">
+            <div className="text-sm font-bold text-gray-700 mb-1">Endpoint:</div>
+            <code className="block p-3 bg-gray-50 border rounded text-sm text-[#03d665] font-bold">POST https://enl-rewriter-backend.onrender.com/api/v1/rewrite</code>
+          </div>
+
+          <div className="mb-4">
+            <div className="text-sm font-bold text-gray-700 mb-1">Headers:</div>
+            <div className="bg-gray-50 border rounded p-3 font-mono text-sm">
+              <span className="text-blue-600">Content-Type:</span> application/json<br/>
+              <span className="text-blue-600">Authorization:</span> Bearer YOUR_API_KEY
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="text-sm font-bold text-gray-700 mb-1">cURL Example:</div>
+            <div className="bg-[#1e1e1e] rounded-xl overflow-hidden relative">
+              <button onClick={() => handleCopyText(`curl -X POST https://enl-rewriter-backend.onrender.com/api/v1/rewrite \\\n-H "Content-Type: application/json" \\\n-H "Authorization: Bearer ${userApiKey}" \\\n-d '{"text": "Hello world", "mode": "rewrite", "tone": "Regular"}'`)} className="absolute top-2 right-2 px-3 py-1 bg-white/10 text-white text-xs rounded hover:bg-white/20">Copy</button>
+              <pre className="p-4 text-[#d4d4d4] font-mono text-xs overflow-x-auto">
+{`curl -X POST https://enl-rewriter-backend.onrender.com/api/v1/rewrite \\
+-H "Content-Type: application/json" \\
+-H "Authorization: Bearer ${userApiKey}" \\
+-d '{
+  "text": "Artificial intelligence is changing the world.",
+  "mode": "rewrite",  // Options: "rewrite" or "avoid_ai"
+  "tone": "Regular"   // Options: "Fluent", "Regular", "Creative"
+}'`}
+              </pre>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm font-bold text-gray-700 mb-1">Success Response:</div>
+            <pre className="p-4 bg-gray-50 border rounded font-mono text-xs overflow-x-auto text-green-700">
+{`{
+  "success": true,
+  "original_words": 7,
+  "rewritten_text": "AI technology is transforming the global landscape.",
+  "words_remaining": 4993
+}`}
+            </pre>
           </div>
         </div>
       </div>
